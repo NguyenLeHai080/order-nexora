@@ -1,5 +1,7 @@
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+# Để `app` import được dù chạy `pytest` hay `python -m pytest` (CI dùng `pytest`).
+pythonpath = ["."]
 testpaths = ["tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
