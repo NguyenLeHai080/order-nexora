@@ -1,8 +1,7 @@
 name: CD
 
-# Build & push Docker image lên GitHub Container Registry (GHCR).
-# Chạy khi code đã được merge vào staging (QA/demo) hoặc prod (production),
-# và khi tạo tag phiên bản (v*).
+# Build & push Docker image của backend lên GitHub Container Registry (GHCR).
+# Chạy khi code merge vào staging (QA/demo) hoặc prod (production), hoặc tag v*.
 on:
   push:
     branches: [staging, prod]
@@ -14,7 +13,7 @@ concurrency:
 
 jobs:
   build-and-push:
-    name: Build & Push image
+    name: Build & Push backend image
     runs-on: ubuntu-latest
 
     # Dùng GITHUB_TOKEN sẵn có để đẩy image — không cần secret ngoài.
@@ -26,46 +25,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Bỏ qua nếu chưa có Dockerfile (an toàn ở giai đoạn khởi tạo).
-      - name: Detect Dockerfile
-        id: detect
-        run: |
-          if [ -f Dockerfile ]; then
-            echo "has_dockerfile=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_dockerfile=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Chưa có Dockerfile — bỏ qua build image."
-          fi
-
       - name: Set up Docker Buildx
-        if: steps.detect.outputs.has_dockerfile == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: steps.detect.outputs.has_dockerfile == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Tạo tag/label cho image. ghcr.io/<owner>/<repo>
+      # Tạo tag/label cho image. ghcr.io/<owner>/<repo>-backend
       - name: Extract metadata
-        if: steps.detect.outputs.has_dockerfile == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}-backend
           tags: |
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short
 
       - name: Build and push
-        if: steps.detect.outputs.has_dockerfile == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./backend
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
