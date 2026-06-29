@@ -47,8 +47,16 @@ function Invoke-Logged($FilePath, [string[]]$Arguments, $WorkingDirectory) {
 }
 
 function Test-DirtyWorktree {
-    $statusText = (& git -C $Root status --porcelain | Out-String).Trim()
-    return -not [string]::IsNullOrWhiteSpace($statusText)
+    & git -C $Root diff --quiet --ignore-submodules -- *> $null
+    $hasWorkingTreeChanges = $LASTEXITCODE -ne 0
+
+    & git -C $Root diff --cached --quiet --ignore-submodules -- *> $null
+    $hasStagedChanges = $LASTEXITCODE -ne 0
+
+    $untracked = (& git -C $Root ls-files --others --exclude-standard | Select-Object -First 1 | Out-String).Trim()
+    $hasUntrackedFiles = -not [string]::IsNullOrWhiteSpace($untracked)
+
+    return $hasWorkingTreeChanges -or $hasStagedChanges -or $hasUntrackedFiles
 }
 
 function Stop-PortProcess([int]$Port) {
