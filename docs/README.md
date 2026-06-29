@@ -18,6 +18,7 @@ Tài liệu được chia theo nhóm để dễ quản lý:
 | [frontend-guide.md](frontend-guide.md) | Mô hình module FE, assets, SCSS, cách thêm màn hình mới | Frontend dev |
 | [ui-kit.md](ui-kit.md) | Thư viện component dùng chung | Frontend dev |
 | [deployment.md](deployment.md) | Cấu hình server tự cập nhật khi `prod` có code mới | DevOps |
+| [production-hardening.md](production-hardening.md) | Tối ưu production: DB, backup, log, runtime | DevOps |
 | [api/README.md](api/README.md) | Tài liệu API, chia nhỏ theo nhóm endpoint | Mọi người |
 | [business/README.md](business/README.md) | Tài liệu nghiệp vụ, chia nhỏ theo phân hệ | PO / dev |
 | [contributing.md](contributing.md) | Git, commit, PR, review, Definition of Done | Mọi người |

@@ -7,9 +7,23 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from app.core.config import settings
 
 # SQLite cần connect_args riêng; Postgres/MySQL thì không.
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+engine_kwargs = {
+    "connect_args": connect_args,
+    "pool_pre_ping": True,
+}
 
-engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
+if not is_sqlite:
+    engine_kwargs.update(
+        {
+            "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow,
+            "pool_recycle": settings.db_pool_recycle_seconds,
+        }
+    )
+
+engine = create_engine(settings.database_url, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
