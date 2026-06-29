@@ -1,0 +1,13 @@
+// ============================================================
+// main.scss — điểm gộp toàn bộ style của ứng dụng.
+// Thứ tự import: biến & mixin trước, rồi base → layout → component.
+// Import file này một lần duy nhất tại src/main.tsx.
+// ============================================================
+@use "variables";
+@use "mixins";
+
+@use "base";
+@use "layout";
+@use "components";
+@use "auth";
+@use "ui-kit";

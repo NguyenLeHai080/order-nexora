@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+# Để `app` import được dù chạy `pytest` hay `python -m pytest` (CI dùng `pytest`).
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ANN", "BLE"]
+# B008: FastAPI dùng Depends(...) trong default argument là pattern chuẩn, không phải lỗi.
+# ANN401: response envelope/helpers nhận dữ liệu bất kỳ (Any) là cố ý.
+ignore = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN206", "B008", "ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+"app/seed.py" = ["ANN"]
