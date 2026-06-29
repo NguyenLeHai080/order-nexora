@@ -12,6 +12,7 @@ import secrets
 from dataclasses import dataclass
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException, NotFoundError
@@ -19,9 +20,11 @@ from app.modules.inventory.service import apply_movement, has_movement, uses_loc
 from app.modules.invoices import service as invoice_service
 from app.modules.orders.models import Order
 from app.modules.partner import service as partner_service
+from app.modules.permissions.models import Role
 from app.modules.products.models import Product
+from app.modules.settings import service as settings_service
 from app.modules.suppliers.models import Supplier
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole
 from app.modules.vouchers.service import apply_voucher
 from app.modules.warranties import service as warranty_service
 
@@ -47,6 +50,13 @@ def _fetch_from_supplier(db: Session, order: Order, product: Product) -> _Delive
 
     supplier = db.get(Supplier, product.supplier_id) if product.supplier_id else None
 
+    if product.delivery_type == "MANUAL":
+        cfg = settings_service.get_manual_fulfillment_config(db)
+        return _Delivery(
+            status="processing",
+            note=cfg["instructions"] or "Don can nhan vien xu ly thu cong.",
+        )
+
     if supplier is not None and registry.has_capability(supplier.driver, "orders"):
         result = partner_service.fulfill_via_provider(db, order, product, supplier)
         return _Delivery(status=result.status, content=result.delivered_content, note=result.note)
@@ -56,6 +66,56 @@ def _fetch_from_supplier(db: Session, order: Order, product: Product) -> _Delive
         return _Delivery(status="failed", note="Sản phẩm đã hết hàng.")
     content = f"[DELIVERED] {product.name} - mã: {secrets.token_hex(6).upper()}"
     return _Delivery(status="success", content=content)
+
+
+def resolve_owner_user_id(db: Session, organization_id: int | None, fallback_user_id: int) -> int:
+    raw = settings_service.get_value(db, settings_service.OWNER_WALLET_USER_ID_KEY)
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+
+    stmt = (
+        select(User.id)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(Role.name == "admin", User.status == "active")
+        .order_by(User.id.asc())
+    )
+    if organization_id is not None:
+        stmt = stmt.where(UserRole.organization_id == organization_id)
+    owner_id = db.scalar(stmt)
+    return int(owner_id or fallback_user_id)
+
+
+def credit_owner_profit(db: Session, order: Order) -> None:
+    if not order.owner_user_id:
+        return
+    owner = db.get(User, order.owner_user_id)
+    if owner is None:
+        return
+    owner.balance = (owner.balance or Decimal("0")) + (order.owner_profit or Decimal("0"))
+
+
+def reverse_owner_profit(db: Session, order: Order) -> None:
+    if not order.owner_user_id:
+        return
+    owner = db.get(User, order.owner_user_id)
+    if owner is None:
+        return
+    owner.balance = (owner.balance or Decimal("0")) - (order.owner_profit or Decimal("0"))
+
+
+def apply_owner_profit_delta(db: Session, order: Order, new_owner_profit: Decimal) -> None:
+    old_owner_profit = order.owner_profit or Decimal("0")
+    delta = new_owner_profit - old_owner_profit
+    if not order.owner_user_id:
+        order.owner_user_id = resolve_owner_user_id(db, order.organization_id, order.user_id)
+    owner = db.get(User, order.owner_user_id) if order.owner_user_id else None
+    if owner is not None and delta:
+        owner.balance = (owner.balance or Decimal("0")) + delta
+    order.owner_profit = new_owner_profit
 
 
 def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_code: str | None) -> Order:
@@ -79,6 +139,7 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
     # Giá vốn (giá nhà cung cấp) — snapshot để tính lợi nhuận về sau.
     unit_cost = product.base_price or Decimal("0")
     total_cost = unit_cost * Decimal(quantity)
+    supplier_payable = total_cost if product.supplier_id else Decimal("0")
 
     # Áp voucher (nếu có) — giảm trên tổng tiền.
     if voucher_code:
@@ -99,9 +160,20 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
         total_amount=total,
         unit_cost=unit_cost,
         total_cost=total_cost,
+        supplier_id=product.supplier_id,
+        supplier_payable=supplier_payable,
+        owner_user_id=resolve_owner_user_id(db, product.organization_id, user_id),
+        owner_profit=total - total_cost,
+        fulfillment_type=product.delivery_type or ("local_stock" if local_stock else "provider"),
         status="processing",
         organization_id=product.organization_id,
     )
+    if product.delivery_type == "MANUAL":
+        cfg = settings_service.get_manual_fulfillment_config(db)
+        order.manual_fulfillment_required = True
+        order.manual_contact_name = cfg["name"]
+        order.manual_contact_url = cfg["zalo_url"]
+        order.manual_qr_image_url = cfg["qr_url"]
     db.add(order)
     db.commit()
     db.refresh(order)
@@ -121,9 +193,12 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
         # Đơn còn chờ admin NCC xử lý thủ công — giữ tiền, chờ webhook/poll cập nhật.
         order.status = "processing"
         order.note = "Đơn đang chờ nhà cung cấp xử lý."
+        if order.manual_fulfillment_required:
+            order.note = delivery.note or "Don dang cho nhan vien xu ly thu cong."
         product.sold_count = (product.sold_count or 0) + quantity
         _record_sale_ledger(db, order, product, local_stock=local_stock,
                             reason="Bán hàng (chờ xử lý)")
+        credit_owner_profit(db, order)
         db.commit()
         db.refresh(order)
         return order
@@ -133,6 +208,7 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
     order.status = "success"
     product.sold_count = (product.sold_count or 0) + quantity
     _record_sale_ledger(db, order, product, local_stock=local_stock, reason="Bán hàng")
+    credit_owner_profit(db, order)
     # Phát hành hóa đơn + phiếu bảo hành (nếu có) trong cùng transaction.
     invoice_service.issue_for_order(db, order, product, user, commit=False)
     warranty_service.create_for_order(db, order, product, commit=False)
@@ -185,6 +261,7 @@ def cancel_order(db: Session, order: Order, actor_id: int) -> Order:
     user = db.get(User, order.user_id)
     if user is not None:
         user.balance = (user.balance or Decimal("0")) + (order.total_amount or Decimal("0"))
+    reverse_owner_profit(db, order)
 
     # Hồi kho + đảo dòng tiền nếu đơn đã ghi sổ bán (`out`) và chưa hoàn (`return`).
     product = db.get(Product, order.product_id) if order.product_id else None

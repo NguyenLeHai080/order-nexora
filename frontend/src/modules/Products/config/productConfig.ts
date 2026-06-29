@@ -18,3 +18,10 @@ export const DELIVERY_TYPE_LABELS: Record<string, string> = {
   SHARED_CONTENT: 'Tự động (dùng chung)',
   MANUAL: 'Thủ công',
 };
+
+export const DELIVERY_TYPE_OPTIONS = [
+  { value: '', label: 'Tự động theo kho/NCC' },
+  { value: 'STOCK_ITEM', label: DELIVERY_TYPE_LABELS.STOCK_ITEM },
+  { value: 'SHARED_CONTENT', label: DELIVERY_TYPE_LABELS.SHARED_CONTENT },
+  { value: 'MANUAL', label: DELIVERY_TYPE_LABELS.MANUAL },
+];

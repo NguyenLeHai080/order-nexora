@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -33,6 +33,19 @@ class Order(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     # Snapshot giá vốn (giá nhà cung cấp) tại thời điểm mua — để tính lợi nhuận.
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"))
     total_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"))
+    supplier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    supplier_payable: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"))
+    owner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    owner_profit: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"))
+    fulfillment_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    manual_fulfillment_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    manual_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    manual_contact_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manual_qr_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default="processing", index=True)
     # processing | success | failed
