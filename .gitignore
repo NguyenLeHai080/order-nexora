@@ -68,6 +68,7 @@ htmlcov/
 # Runtime uploads / server state
 backend/storage/
 ops/.last-prod-*
+ops/*.lock
 
 # Accidental npm lock in Python backend
 backend/package-lock.json
