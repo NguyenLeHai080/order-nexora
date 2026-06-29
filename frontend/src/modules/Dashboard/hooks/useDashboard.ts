@@ -30,6 +30,9 @@ export interface DashboardData {
   orderTotal: number;
   productTotal: number;
   revenue: number;
+  supplierPayable: number;
+  ownerProfit: number;
+  ownerWalletBalance: number;
   leaders: LeaderRow[];
   recent: OrderRow[];
 }
@@ -45,6 +48,9 @@ export function useDashboard(): DashboardData {
   const [orderTotal, setOrderTotal] = useState(0);
   const [productTotal, setProductTotal] = useState(0);
   const [revenue, setRevenue] = useState(0);
+  const [supplierPayable, setSupplierPayable] = useState(0);
+  const [ownerProfit, setOwnerProfit] = useState(0);
+  const [ownerWalletBalance, setOwnerWalletBalance] = useState(0);
   const [leaders, setLeaders] = useState<LeaderRow[]>([]);
   const [recent, setRecent] = useState<OrderRow[]>([]);
 
@@ -67,15 +73,22 @@ export function useDashboard(): DashboardData {
       if (can('index', 'Order')) {
         tasks.push(
           apiClient
+            .get('/orders/profit-summary')
+            .then((r) => {
+              const d = r.data.data ?? {};
+              setRevenue(parseFloat(d.revenue || '0'));
+              setSupplierPayable(parseFloat(d.supplier_payable || '0'));
+              setOwnerProfit(parseFloat(d.owner_profit || d.profit || '0'));
+              setOwnerWalletBalance(parseFloat(d.owner_wallet_balance || '0'));
+              setOrderTotal(d.order_count ?? 0);
+            })
+            .catch(() => {}),
+        );
+        tasks.push(
+          apiClient
             .get('/orders', { params: { limit: 5, status: 'success' } })
             .then((r) => {
-              setOrderTotal(r.data.meta?.total ?? 0);
               setRecent(r.data.data ?? []);
-              const sum = (r.data.data ?? []).reduce(
-                (acc: number, o: OrderRow) => acc + parseFloat(o.total_amount || '0'),
-                0,
-              );
-              setRevenue(sum);
             })
             .catch(() => {}),
         );
@@ -93,5 +106,16 @@ export function useDashboard(): DashboardData {
     void load();
   }, [can]);
 
-  return { loading, userStats, orderTotal, productTotal, revenue, leaders, recent };
+  return {
+    loading,
+    userStats,
+    orderTotal,
+    productTotal,
+    revenue,
+    supplierPayable,
+    ownerProfit,
+    ownerWalletBalance,
+    leaders,
+    recent,
+  };
 }

@@ -11,7 +11,18 @@ import RecentOrders from '../components/RecentOrders';
 
 export default function DashboardPage() {
   const { can } = useAuthStore();
-  const { loading, userStats, orderTotal, productTotal, revenue, leaders, recent } = useDashboard();
+  const {
+    loading,
+    userStats,
+    orderTotal,
+    productTotal,
+    revenue,
+    supplierPayable,
+    ownerProfit,
+    ownerWalletBalance,
+    leaders,
+    recent,
+  } = useDashboard();
 
   if (loading) {
     return <div className="text-center py-5"><Loader /></div>;
@@ -35,7 +46,16 @@ export default function DashboardPage() {
           <StatCard label="Đơn thành công" value={formatNumber(orderTotal)} icon="bi-bag-check" color="success" />
         </Col>
         <Col md={6} xl={3}>
-          <StatCard label="Doanh thu (gần đây)" value={formatCurrency(revenue)} icon="bi-cash-stack" color="warning" />
+          <StatCard label="Doanh thu" value={formatCurrency(revenue)} icon="bi-cash-stack" color="warning" />
+        </Col>
+        <Col md={6} xl={3}>
+          <StatCard label="Phải trả NCC" value={formatCurrency(supplierPayable)} icon="bi-arrow-left-right" color="secondary" />
+        </Col>
+        <Col md={6} xl={3}>
+          <StatCard label="Lãi về ví chủ" value={formatCurrency(ownerProfit)} icon="bi-graph-up-arrow" color="success" />
+        </Col>
+        <Col md={6} xl={3}>
+          <StatCard label="Ví chủ hiện có" value={formatCurrency(ownerWalletBalance)} icon="bi-wallet2" color="info" />
         </Col>
       </Row>
 

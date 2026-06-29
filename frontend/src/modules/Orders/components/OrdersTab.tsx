@@ -26,6 +26,9 @@ export default function OrdersTab() {
     { key: 'product_name', header: 'Sản phẩm' },
     { key: 'quantity', header: 'SL', render: (o) => o.quantity },
     { key: 'total_amount', header: 'Tổng tiền', render: (o) => <span className="fw-semibold text-primary">{formatCurrency(o.total_amount)}</span> },
+    { key: 'total_cost', header: 'Giá vốn', render: (o) => <span className="text-muted">{formatCurrency(o.total_cost)}</span> },
+    { key: 'supplier_payable', header: 'Trả NCC', render: (o) => <span className="text-muted">{formatCurrency(o.supplier_payable)}</span> },
+    { key: 'owner_profit', header: 'Lãi ví chủ', render: (o) => <span className="fw-semibold text-success">{formatCurrency(o.owner_profit)}</span> },
     { key: 'status', header: 'Trạng thái', render: (o) => <StatusBadge status={o.status} /> },
     { key: 'created_at', header: 'Thời gian', render: (o) => formatDateTime(o.created_at) },
     {
