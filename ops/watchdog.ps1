@@ -63,7 +63,7 @@ while ($true) {
         Remove-StaleBackendProcesses
         Write-Log "backend down -> starting uvicorn :8000"
         Start-Process -FilePath $Python `
-            -ArgumentList '-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8000','--proxy-headers','--forwarded-allow-ips','*','--workers',"$WorkerCount" `
+            -ArgumentList '-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8000','--proxy-headers','--forwarded-allow-ips','127.0.0.1','--workers',"$WorkerCount" `
             -WorkingDirectory $Backend -WindowStyle Hidden
         Start-Sleep -Seconds 5
     }
