@@ -47,8 +47,8 @@ function Invoke-Logged($FilePath, [string[]]$Arguments, $WorkingDirectory) {
 }
 
 function Test-DirtyWorktree {
-    $status = & git -C $Root status --porcelain
-    return [bool]$status
+    $statusText = (& git -C $Root status --porcelain | Out-String).Trim()
+    return -not [string]::IsNullOrWhiteSpace($statusText)
 }
 
 function Stop-PortProcess([int]$Port) {
