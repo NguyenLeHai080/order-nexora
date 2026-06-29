@@ -6,6 +6,10 @@ export interface ProfitSummary {
   revenue: string;
   cost: string;
   profit: string;
+  supplier_payable: string;
+  owner_profit: string;
+  owner_wallet_user_id?: number | null;
+  owner_wallet_balance?: string | null;
   margin_percent: number;
   order_count: number;
 }

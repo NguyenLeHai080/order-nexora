@@ -54,6 +54,21 @@ async def lifespan(_app: FastAPI):
                 "cash_out": "NUMERIC(18, 2) DEFAULT 0",
             },
         )
+        ensure_columns(
+            engine,
+            "orders",
+            {
+                "supplier_id": "INTEGER",
+                "supplier_payable": "NUMERIC(18, 2) DEFAULT 0",
+                "owner_user_id": "INTEGER",
+                "owner_profit": "NUMERIC(18, 2) DEFAULT 0",
+                "fulfillment_type": "VARCHAR(30)",
+                "manual_fulfillment_required": "BOOLEAN DEFAULT 0",
+                "manual_contact_name": "VARCHAR(255)",
+                "manual_contact_url": "TEXT",
+                "manual_qr_image_url": "TEXT",
+            },
+        )
     yield
 
 

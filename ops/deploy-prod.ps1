@@ -113,6 +113,10 @@ try {
     if ($InstallDevDependencies -and (Test-Path (Join-Path $backend 'requirements-dev.txt'))) {
         Invoke-Logged $venvPython @('-m', 'pip', 'install', '-r', 'requirements-dev.txt') $backend
     }
+    $schemaScript = Join-Path $Root 'ops\apply-app-schema.py'
+    if (Test-Path $schemaScript) {
+        Invoke-Logged $venvPython @($schemaScript) $backend
+    }
 
     $frontend = Join-Path $Root 'frontend'
     if (Test-Path (Join-Path $frontend 'package.json')) {

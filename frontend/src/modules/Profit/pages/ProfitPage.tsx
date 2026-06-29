@@ -13,10 +13,10 @@ export default function ProfitPage() {
     { key: 'product_name', header: 'Sản phẩm', render: (r) => <span className="fw-semibold">{r.product_name}</span> },
     { key: 'order_count', header: 'Số đơn', render: (r) => formatNumber(r.order_count) },
     { key: 'revenue', header: 'Doanh thu', render: (r) => formatCurrency(r.revenue) },
-    { key: 'cost', header: 'Giá vốn (NCC)', render: (r) => <span className="text-muted">{formatCurrency(r.cost)}</span> },
+    { key: 'cost', header: 'Giá vốn/kho', render: (r) => <span className="text-muted">{formatCurrency(r.cost)}</span> },
     {
       key: 'profit',
-      header: 'Lợi nhuận',
+      header: 'Lãi',
       render: (r) => {
         const profit = parseFloat(r.profit);
         return <span className={`fw-semibold ${profit >= 0 ? 'text-success' : 'text-danger'}`}>{formatCurrency(r.profit)}</span>;
@@ -26,9 +26,8 @@ export default function ProfitPage() {
 
   return (
     <>
-      <PageHeader title="Lợi nhuận" breadcrumb="Kinh doanh › Lợi nhuận" />
+      <PageHeader title="Lợi nhuận" breadcrumb="Kinh doanh > Lợi nhuận" />
 
-      {/* Bộ lọc khoảng ngày */}
       <Row className="g-2 align-items-end mb-3">
         <Col md={3}>
           <TextInput
@@ -55,16 +54,21 @@ export default function ProfitPage() {
         </Col>
       </Row>
 
-      {/* Thẻ tổng hợp */}
       <Row className="g-3 mb-4">
         <Col md={3} sm={6}>
           <StatCard label="Doanh thu" value={formatCurrency(summary?.revenue ?? 0)} icon="bi-cash-stack" color="info" />
         </Col>
         <Col md={3} sm={6}>
-          <StatCard label="Giá vốn (NCC)" value={formatCurrency(summary?.cost ?? 0)} icon="bi-truck" color="secondary" />
+          <StatCard label="Giá vốn/kho" value={formatCurrency(summary?.cost ?? 0)} icon="bi-truck" color="secondary" />
         </Col>
         <Col md={3} sm={6}>
-          <StatCard label="Lợi nhuận" value={formatCurrency(summary?.profit ?? 0)} icon="bi-graph-up-arrow" color="success" />
+          <StatCard label="Phải trả NCC" value={formatCurrency(summary?.supplier_payable ?? 0)} icon="bi-arrow-left-right" color="warning" />
+        </Col>
+        <Col md={3} sm={6}>
+          <StatCard label="Lãi về ví chủ" value={formatCurrency(summary?.owner_profit ?? summary?.profit ?? 0)} icon="bi-graph-up-arrow" color="success" />
+        </Col>
+        <Col md={3} sm={6}>
+          <StatCard label="Ví chủ hiện có" value={formatCurrency(summary?.owner_wallet_balance ?? 0)} icon="bi-wallet2" color="primary" />
         </Col>
         <Col md={3} sm={6}>
           <StatCard

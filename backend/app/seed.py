@@ -116,6 +116,20 @@ def seed() -> None:
                 "20",
                 "% markup mặc định áp cho sản phẩm mới khi đồng bộ NCC",
             )
+        if settings_service.get_value(db, settings_service.MANUAL_FULFILLMENT_ZALO_NAME_KEY) is None:
+            settings_service.set_value(
+                db,
+                settings_service.MANUAL_FULFILLMENT_ZALO_NAME_KEY,
+                "Nguyen Le Hai",
+                "Ten nhan vien/Zalo xu ly don can admin giao thu cong",
+            )
+        if settings_service.get_value(db, settings_service.MANUAL_FULFILLMENT_INSTRUCTIONS_KEY) is None:
+            settings_service.set_value(
+                db,
+                settings_service.MANUAL_FULFILLMENT_INSTRUCTIONS_KEY,
+                "Don nay can nhan vien xu ly thu cong. Vui long quet Zalo hoac lien he nhan vien de giao hang.",
+                "Huong dan hien tren don MANUAL sau khi khach thanh toan",
+            )
 
         print("Seed xong: admin@example.com / password, org_id =", org.id)
     finally:

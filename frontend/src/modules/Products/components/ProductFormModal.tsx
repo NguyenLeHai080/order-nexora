@@ -4,7 +4,7 @@ import { extractError } from '../../../core/useList';
 import { formatCurrency } from '../../../core/format';
 import { Button, TextInput, SelectInput } from '../../../ui';
 import { productActions, type Product } from '../hooks/useProducts';
-import { PRODUCT_STATUS_OPTIONS, STOCK_STATUS_OPTIONS } from '../config/productConfig';
+import { DELIVERY_TYPE_OPTIONS, PRODUCT_STATUS_OPTIONS, STOCK_STATUS_OPTIONS } from '../config/productConfig';
 import { computeSalePrice, computeUnitProfit, computeMargin } from '../helpers/pricing';
 
 export interface SupplierOpt {
@@ -27,6 +27,7 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
   const [markupPercent, setMarkupPercent] = useState('0');
   const [markupAmount, setMarkupAmount] = useState('0');
   const [supplierId, setSupplierId] = useState('');
+  const [deliveryType, setDeliveryType] = useState('');
   const [stockStatus, setStockStatus] = useState('in_stock');
   const [warrantyDays, setWarrantyDays] = useState('0');
   const [lowStockThreshold, setLowStockThreshold] = useState('0');
@@ -40,6 +41,7 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
     setMarkupPercent(editing?.markup_percent ?? '0');
     setMarkupAmount(editing?.markup_amount ?? '0');
     setSupplierId(editing?.supplier_id ? String(editing.supplier_id) : '');
+    setDeliveryType(editing?.delivery_type ?? '');
     setStockStatus(editing?.stock_status ?? 'in_stock');
     setWarrantyDays(editing?.warranty_days != null ? String(editing.warranty_days) : '0');
     setLowStockThreshold(editing?.low_stock_threshold != null ? String(editing.low_stock_threshold) : '0');
@@ -69,6 +71,7 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
         markup_percent: parseFloat(markupPercent || '0'),
         markup_amount: parseFloat(markupAmount || '0'),
         supplier_id: supplierId ? Number(supplierId) : null,
+        delivery_type: deliveryType || null,
         warranty_days: parseInt(warrantyDays || '0', 10),
         low_stock_threshold: parseInt(lowStockThreshold || '0', 10),
         status,
@@ -105,6 +108,11 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
               <SelectInput id="prod-supplier" label="Nhà cung cấp" value={supplierId}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSupplierId(e.target.value)}
                 options={supplierOptions} />
+            </Col>
+            <Col md={4}>
+              <SelectInput id="prod-delivery-type" label="Kiểu giao hàng" value={deliveryType}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDeliveryType(e.target.value)}
+                options={DELIVERY_TYPE_OPTIONS} />
             </Col>
             <Col md={4}>
               <TextInput id="prod-base" label="Giá gốc (kho)" type="number" min="0" value={basePrice}

@@ -11,6 +11,18 @@ export interface Order {
   unit_price: string;
   quantity: number;
   total_amount: string;
+  unit_cost: string;
+  total_cost: string;
+  supplier_id?: number | null;
+  supplier_payable: string;
+  owner_user_id?: number | null;
+  owner_profit: string;
+  fulfillment_type?: string | null;
+  manual_fulfillment_required: boolean;
+  manual_contact_name?: string | null;
+  manual_contact_url?: string | null;
+  manual_qr_image_url?: string | null;
+  profit: string;
   status: string;
   delivered_content: string | null;
   created_at: string | null;

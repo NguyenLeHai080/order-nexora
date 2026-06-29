@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppException, NotFoundError
 from app.modules.inventory.service import apply_movement, uses_local_stock
 from app.modules.invoices import service as invoice_service
+from app.modules.orders import service as order_service
 from app.modules.orders.models import Order
 from app.modules.products.models import Product
 from app.modules.returns.models import ReturnRequest
@@ -114,6 +115,7 @@ def _complete_return(
     refund = order.total_amount or Decimal("0")
     if user is not None:
         user.balance = (user.balance or Decimal("0")) + refund
+    order_service.reverse_owner_profit(db, order)
     req.refund_amount = refund
 
     if original is not None:
@@ -165,6 +167,7 @@ def _complete_exchange(
     new_unit = new_product.sale_price
     new_revenue = new_unit * Decimal(qty)
     new_cost = (new_product.base_price or Decimal("0")) * Decimal(qty)
+    new_owner_profit = new_revenue - new_cost
 
     # Xuất kho / ghi doanh thu sản phẩm MỚI.
     if uses_local_stock(db, new_product):
@@ -218,4 +221,11 @@ def _complete_exchange(
     order.total_amount = (order.total_amount or Decimal("0")) + delta
     order.unit_cost = new_product.base_price or Decimal("0")
     order.total_cost = new_cost
+    order.supplier_id = new_product.supplier_id
+    order.supplier_payable = new_cost if new_product.supplier_id else Decimal("0")
+    order.fulfillment_type = new_product.delivery_type or (
+        "local_stock" if uses_local_stock(db, new_product) else "provider"
+    )
+    order.manual_fulfillment_required = new_product.delivery_type == "MANUAL"
+    order_service.apply_owner_profit_delta(db, order, new_owner_profit)
     order.note = "Đơn đã đổi sản phẩm."
