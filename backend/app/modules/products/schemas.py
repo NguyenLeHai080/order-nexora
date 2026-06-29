@@ -12,6 +12,7 @@ class ProductCreate(BaseModel):
     supplier_id: int | None = None
     external_id: str | None = None
     base_price: Decimal = Decimal("0.00")
+    delivery_type: str | None = Field(None, pattern="^(STOCK_ITEM|SHARED_CONTENT|MANUAL)$")
     markup_percent: Decimal = Decimal("0.00")
     markup_amount: Decimal = Decimal("0.00")
     quantity: int = Field(0, ge=0)
@@ -27,6 +28,7 @@ class ProductUpdate(BaseModel):
     supplier_id: int | None = None
     external_id: str | None = None
     base_price: Decimal | None = None
+    delivery_type: str | None = Field(None, pattern="^(STOCK_ITEM|SHARED_CONTENT|MANUAL)$")
     markup_percent: Decimal | None = None
     markup_amount: Decimal | None = None
     warranty_days: int | None = Field(None, ge=0)

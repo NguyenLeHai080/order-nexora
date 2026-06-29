@@ -102,3 +102,53 @@ def test_purchase_insufficient_balance(client: TestClient, admin_token: str, adm
     )
     assert res.status_code == 400
     assert res.json()["success"] is False
+
+
+def test_purchase_credits_owner_profit_wallet(client: TestClient, admin_token: str, admin_org_id: int):
+    headers = _auth(admin_token, admin_org_id)
+    prod = client.post(
+        "/api/products",
+        headers=headers,
+        json={"name": "SP co lai", "base_price": "10000", "markup_percent": "50"},
+    ).json()["data"]
+    client.post("/api/inventory/stock-in", headers=headers, json={"product_id": prod["id"], "quantity": 2})
+
+    me = client.get("/api/user", headers=headers).json()["data"]["user"]
+    client.post(f"/api/users/{me['id']}/balance", headers=headers, json={"amount": "100000"})
+    bal_before = float(client.get(f"/api/users/{me['id']}", headers=headers).json()["data"]["balance"])
+
+    order = client.post("/api/orders", headers=headers, json={"product_id": prod["id"], "quantity": 1}).json()["data"]
+    assert order["total_amount"] == "15000.00"
+    assert order["total_cost"] == "10000.00"
+    assert order["owner_profit"] == "5000.00"
+    assert order["supplier_payable"] == "0.00"
+
+    bal_after = float(client.get(f"/api/users/{me['id']}", headers=headers).json()["data"]["balance"])
+    assert bal_before - bal_after == 10000
+
+    summary = client.get("/api/orders/profit-summary", headers=headers).json()["data"]
+    assert float(summary["owner_profit"]) >= 5000
+    assert summary["owner_wallet_user_id"] == me["id"]
+
+
+def test_manual_fulfillment_order_waits_for_staff(client: TestClient, admin_token: str, admin_org_id: int):
+    headers = _auth(admin_token, admin_org_id)
+    prod = client.post(
+        "/api/products",
+        headers=headers,
+        json={
+            "name": "SP can admin xu ly",
+            "base_price": "20000",
+            "markup_percent": "25",
+            "delivery_type": "MANUAL",
+        },
+    ).json()["data"]
+    client.post("/api/inventory/stock-in", headers=headers, json={"product_id": prod["id"], "quantity": 1})
+    me = client.get("/api/user", headers=headers).json()["data"]["user"]
+    client.post(f"/api/users/{me['id']}/balance", headers=headers, json={"amount": "100000"})
+
+    order = client.post("/api/orders", headers=headers, json={"product_id": prod["id"], "quantity": 1}).json()["data"]
+    assert order["status"] == "processing"
+    assert order["manual_fulfillment_required"] is True
+    assert order["manual_contact_name"] == "Nguyen Le Hai"
+    assert order["owner_profit"] == "5000.00"

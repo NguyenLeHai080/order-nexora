@@ -24,6 +24,15 @@ class OrderOut(BaseModel):
     total_amount: Decimal
     unit_cost: Decimal
     total_cost: Decimal
+    supplier_id: int | None = None
+    supplier_payable: Decimal
+    owner_user_id: int | None = None
+    owner_profit: Decimal
+    fulfillment_type: str | None = None
+    manual_fulfillment_required: bool = False
+    manual_contact_name: str | None = None
+    manual_contact_url: str | None = None
+    manual_qr_image_url: str | None = None
     profit: Decimal
     status: str
     delivered_content: str | None
@@ -38,6 +47,10 @@ class ProfitSummary(BaseModel):
     revenue: Decimal  # tổng tiền khách trả
     cost: Decimal  # tổng giá vốn nhà cung cấp
     profit: Decimal  # revenue - cost
+    supplier_payable: Decimal = Decimal("0.00")
+    owner_profit: Decimal = Decimal("0.00")
+    owner_wallet_user_id: int | None = None
+    owner_wallet_balance: Decimal | None = None
     margin_percent: float  # biên lợi nhuận = profit / revenue * 100
     order_count: int
 

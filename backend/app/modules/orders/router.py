@@ -44,20 +44,30 @@ def profit_summary(
     stmt = select(
         func.coalesce(func.sum(Order.total_amount), 0),
         func.coalesce(func.sum(Order.total_cost), 0),
+        func.coalesce(func.sum(Order.supplier_payable), 0),
+        func.coalesce(func.sum(Order.owner_profit), 0),
         func.count(Order.id),
     ).where(Order.status == "success")
     stmt = _scope_profit(stmt, ctx.organization_id, from_date, to_date)
 
-    revenue, cost, count = db.execute(stmt).one()
+    revenue, cost, supplier_payable, owner_profit, count = db.execute(stmt).one()
     revenue = revenue or 0
     cost = cost or 0
+    supplier_payable = supplier_payable or 0
+    owner_profit = owner_profit or 0
     profit = revenue - cost
     margin = float(profit) / float(revenue) * 100 if revenue else 0.0
+    owner_user_id = service.resolve_owner_user_id(db, ctx.organization_id, ctx.user_id)
+    owner = db.get(User, owner_user_id) if owner_user_id else None
     return success(
         {
             "revenue": str(revenue),
             "cost": str(cost),
             "profit": str(profit),
+            "supplier_payable": str(supplier_payable),
+            "owner_profit": str(owner_profit),
+            "owner_wallet_user_id": owner_user_id,
+            "owner_wallet_balance": str(owner.balance) if owner is not None else None,
             "margin_percent": round(margin, 2),
             "order_count": count or 0,
         }
