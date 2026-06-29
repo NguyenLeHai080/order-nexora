@@ -1,59 +1,29 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { login } from '../authApi';
+import { Card } from 'react-bootstrap';
+import LoginForm from '../components/LoginForm';
 
-// Trang đăng nhập. Sau khi login thành công, nếu user có nhiều tổ chức và chưa
-// chọn, điều hướng sang màn chọn tổ chức (TODO); ngược lại vào dashboard.
+// Trang đăng nhập theo phong cách Velzon: hero gradient xanh + card trắng nổi lên.
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('password');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const data = await login(email, password);
-      if (data.current_organization_id == null && data.available_organizations.length > 1) {
-        navigate('/select-organization');
-      } else {
-        navigate('/');
-      }
-    } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Đăng nhập thất bại.';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
-    <div style={{ maxWidth: 360, margin: '80px auto', fontFamily: 'system-ui' }}>
-      <h1>Order Nexora</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email / Tên đăng nhập
-          <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%' }} />
-        </label>
-        <label>
-          Mật khẩu
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: '100%' }}
-          />
-        </label>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
-          {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-        </button>
-      </form>
+    <div className="auth-page">
+      <div className="auth-hero">
+        <h2 className="fw-bold mb-1" style={{ letterSpacing: 2 }}>
+          ORDER NEXORA
+        </h2>
+        <p className="opacity-75 mb-0">Hệ thống quản trị bán sản phẩm số</p>
+      </div>
+
+      <Card className="auth-card shadow">
+        <Card.Body className="p-4">
+          <div className="text-center mb-4">
+            <h5 className="text-primary fw-bold">Chào mừng trở lại!</h5>
+            <p className="text-muted mb-0">Đăng nhập để tiếp tục vào Order Nexora.</p>
+          </div>
+
+          <LoginForm />
+        </Card.Body>
+      </Card>
+
+      <p className="text-muted mt-4 mb-5">© 2026 Order Nexora</p>
     </div>
   );
 }

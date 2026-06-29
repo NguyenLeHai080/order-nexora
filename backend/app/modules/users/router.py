@@ -25,7 +25,34 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 def _out(u: User) -> dict:
-    return UserOut.model_validate(u).model_dump(mode="json")
+    data = UserOut.model_validate(u).model_dump(mode="json")
+    # Nạp vai trò (global, organization_id = None) cho user.
+    from app.modules.permissions.models import Role
+
+    sess = Session.object_session(u)
+    role_ids: list[int] = []
+    role_names: list[str] = []
+    if sess is not None:
+        rows = sess.execute(
+            select(UserRole.role_id).where(UserRole.user_id == u.id)
+        ).scalars().all()
+        role_ids = sorted(set(rows))
+        if role_ids:
+            role_names = sorted(
+                sess.execute(select(Role.name).where(Role.id.in_(role_ids))).scalars().all()
+            )
+    data["role_ids"] = role_ids
+    data["roles"] = role_names
+    return data
+
+
+def _set_roles(db: Session, user_id: int, role_ids: list[int]) -> None:
+    """Đồng bộ vai trò global của user theo danh sách role_ids."""
+    db.query(UserRole).filter(
+        UserRole.user_id == user_id, UserRole.organization_id.is_(None)
+    ).delete(synchronize_session=False)
+    for rid in dict.fromkeys(role_ids):
+        db.add(UserRole(user_id=user_id, role_id=rid, organization_id=None))
 
 
 @router.get("/stats", summary="Thống kê người dùng")
@@ -120,9 +147,13 @@ def update(
     if obj is None:
         raise NotFoundError("Không tìm thấy người dùng.")
     data = body.model_dump(exclude_unset=True)
+    role_ids = data.pop("role_ids", None)
     if "password" in data and data["password"]:
         data["password"] = hash_password(data["password"])
     obj = repo.update(obj, **data)
+    if role_ids is not None:
+        _set_roles(db, obj.id, role_ids)
+        db.commit()
     return {"data": _out(obj), "success": "true", "message": "Cập nhật người dùng thành công."}
 
 

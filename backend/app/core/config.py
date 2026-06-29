@@ -1,6 +1,7 @@
 """Cấu hình hệ thống đọc từ biến môi trường (.env)."""
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,17 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    # Frontend build (SPA) — để FastAPI phục vụ luôn file tĩnh đã build.
+    # Rỗng = tự dò ../frontend/dist so với mã nguồn backend.
+    frontend_dist_dir: str = ""
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str) and value.lower() in {"release", "prod", "production"}:
+            return False
+        return value
 
 
 @lru_cache

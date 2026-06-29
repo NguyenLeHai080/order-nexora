@@ -39,24 +39,37 @@ def test_sale_price_formula(client: TestClient, admin_token: str, admin_org_id: 
 def test_purchase_flow(client: TestClient, admin_token: str, admin_org_id: int):
     headers = _auth(admin_token, admin_org_id)
 
-    # 1) Tạo sản phẩm.
+    # 1) Tạo sản phẩm (thủ công -> tự quản tồn kho local).
     prod = client.post(
         "/api/products",
         headers=headers,
         json={"name": "Khóa học X", "base_price": "50000", "markup_percent": "0"},
     ).json()["data"]
 
-    # 2) Nạp tiền cho admin (admin tự cộng ví của mình qua endpoint balance).
+    # 2) Nhập kho để có tồn (sản phẩm local-stock cần tồn mới bán được).
+    client.post(
+        "/api/inventory/stock-in",
+        headers=headers,
+        json={"product_id": prod["id"], "quantity": 5},
+    )
+
+    # 3) Nạp tiền cho admin (admin tự cộng ví của mình qua endpoint balance).
     me = client.get("/api/user", headers=headers).json()["data"]["user"]
     client.post(f"/api/users/{me['id']}/balance", headers=headers, json={"amount": "100000"})
 
-    # 3) Mua hàng.
+    # 4) Mua hàng.
     res = client.post("/api/orders", headers=headers, json={"product_id": prod["id"], "quantity": 1})
     assert res.status_code == 201, res.text
     order = res.json()["data"]
     assert order["status"] == "success"
     assert order["total_amount"] == "50000.00"
     assert order["delivered_content"] is not None
+
+    # 5) Tồn kho đã giảm + có hóa đơn phát hành.
+    after = client.get(f"/api/products/{prod['id']}", headers=headers).json()["data"]
+    assert after["quantity"] == 4
+    invoices = client.get("/api/invoices", headers=headers).json()["data"]
+    assert any(inv["product_name"] == "Khóa học X" and inv["status"] == "paid" for inv in invoices)
 
 
 def test_purchase_insufficient_balance(client: TestClient, admin_token: str, admin_org_id: int):
@@ -66,6 +79,12 @@ def test_purchase_insufficient_balance(client: TestClient, admin_token: str, adm
         headers=headers,
         json={"name": "SP đắt", "base_price": "999999999", "markup_percent": "0"},
     ).json()["data"]
+    # Nhập kho để qua được cổng tồn kho -> kiểm tra đúng nhánh thiếu số dư.
+    client.post(
+        "/api/inventory/stock-in",
+        headers=headers,
+        json={"product_id": prod["id"], "quantity": 1},
+    )
     # Tạo user mới ví rỗng.
     client.post(
         "/api/users",

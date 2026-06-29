@@ -21,6 +21,7 @@ class UserUpdate(BaseModel):
     user_name: str | None = None
     password: str | None = Field(None, min_length=6)
     status: str | None = Field(None, pattern="^(active|locked)$")
+    role_ids: list[int] | None = None
 
 
 class UserOut(BaseModel):
@@ -30,6 +31,8 @@ class UserOut(BaseModel):
     email: str
     status: str
     balance: Decimal
+    role_ids: list[int] = []
+    roles: list[str] = []
     created_at: datetime | None
     updated_at: datetime | None
 

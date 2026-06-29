@@ -63,6 +63,14 @@ htmlcov/
 # SQLite dev DB
 *.db
 *.sqlite3
+*.db.bak-*
+
+# Runtime uploads / server state
+backend/storage/
+ops/.last-prod-*
+
+# Accidental npm lock in Python backend
+backend/package-lock.json
 
 ### Windows
 # Windows thumbnail cache files

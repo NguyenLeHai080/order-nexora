@@ -20,6 +20,11 @@ _SUBJECTS = [
     "payments",
     "orders",
     "vouchers",
+    "partner",
+    "inventory",
+    "invoices",
+    "warranties",
+    "returns",
 ]
 _ACTIONS = ["index", "show", "store", "update", "destroy"]
 
@@ -98,9 +103,85 @@ def seed() -> None:
             db.add(UserPreference(user_id=admin.id, current_organization_id=org.id))
             db.commit()
 
+        # 5) Nhà cung cấp mẫu + sản phẩm mẫu (để FE có dữ liệu hiển thị ngay).
+        _seed_catalog(db, org.id)
+
+        # 6) Cấu hình mặc định (chỉ tạo nếu chưa có — không ghi đè giá trị admin đã đặt).
+        from app.modules.settings import service as settings_service
+
+        if settings_service.get_value(db, settings_service.DEFAULT_MARKUP_KEY) is None:
+            settings_service.set_value(
+                db,
+                settings_service.DEFAULT_MARKUP_KEY,
+                "20",
+                "% markup mặc định áp cho sản phẩm mới khi đồng bộ NCC",
+            )
+
         print("Seed xong: admin@example.com / password, org_id =", org.id)
     finally:
         db.close()
+
+
+def _seed_catalog(db, org_id: int) -> None:
+    """Tạo 1 nhà cung cấp VD Store (driver vdstore) + vài sản phẩm mẫu.
+
+    Mục đích: FE thấy dữ liệu ngay khi chưa có API key thật. Khi có key, admin
+    nhập vào supplier này rồi bấm "Đồng bộ NCC" để kéo catalog thật về.
+    Giá NCC (base_price) + markup là dữ liệu mô phỏng, an toàn để demo.
+    """
+    from decimal import Decimal
+
+    from app.modules.organizations.utils import slugify
+    from app.modules.products.models import Product
+    from app.modules.suppliers.models import Supplier
+
+    supplier = db.scalars(
+        select(Supplier).where(Supplier.driver == "vdstore", Supplier.organization_id == org_id)
+    ).first()
+    if supplier is None:
+        supplier = Supplier(
+            name="VD Store (demo)",
+            driver="vdstore",
+            api_endpoint="https://api.vanhdao.io.vn/partner/v1",
+            environment="test",
+            status="active",
+            note="Nhà cung cấp mẫu. Nhập API key test rồi bấm Đồng bộ NCC để lấy catalog thật.",
+            organization_id=org_id,
+        )
+        db.add(supplier)
+        db.commit()
+        db.refresh(supplier)
+
+    # base_price = giá NCC (giá vốn); markup_percent = % cộng thêm để ra giá bán.
+    samples = [
+        ("ChatGPT Plus 1 tháng", "prod_demo_chatgpt", Decimal("350000"), Decimal("25")),
+        ("Spotify Premium 1 năm", "prod_demo_spotify", Decimal("180000"), Decimal("30")),
+        ("Canva Pro 1 năm", "prod_demo_canva", Decimal("120000"), Decimal("40")),
+        ("Netflix Premium 1 tháng", "prod_demo_netflix", Decimal("90000"), Decimal("35")),
+        ("YouTube Premium 1 năm", "prod_demo_youtube", Decimal("250000"), Decimal("28")),
+    ]
+    for name, ext_id, base_price, markup in samples:
+        exists = db.scalars(
+            select(Product).where(
+                Product.supplier_id == supplier.id, Product.external_id == ext_id
+            )
+        ).first()
+        if exists is None:
+            db.add(
+                Product(
+                    name=name,
+                    slug=slugify(name),
+                    supplier_id=supplier.id,
+                    external_id=ext_id,
+                    base_price=base_price,
+                    markup_percent=markup,
+                    markup_amount=Decimal("0.00"),
+                    stock_status="in_stock",
+                    status="active",
+                    organization_id=org_id,
+                )
+            )
+    db.commit()
 
 
 if __name__ == "__main__":

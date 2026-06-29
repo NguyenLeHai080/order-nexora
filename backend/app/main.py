@@ -3,9 +3,12 @@
 Trang API docs tự sinh tại /docs (Swagger) và /redoc.
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 import app.database  # noqa: F401 — đăng ký toàn bộ model
 from app.core.config import settings
@@ -18,6 +21,37 @@ from app.middleware.logging import LogActivityMiddleware, MaintenanceMiddleware
 async def lifespan(_app: FastAPI):
     # Tạo bảng nếu chưa có (dev). Production dùng Alembic migration.
     Base.metadata.create_all(bind=engine)
+    # Dev: thêm cột mới còn thiếu vào bảng cũ (create_all không ALTER).
+    if settings.app_env not in {"prod", "production"}:
+        from app.core.dev_migrate import ensure_columns
+
+        ensure_columns(engine, "suppliers", {"config": "JSON"})
+        ensure_columns(
+            engine,
+            "products",
+            {
+                "quantity": "INTEGER DEFAULT 0",
+                "low_stock_threshold": "INTEGER DEFAULT 0",
+                "warranty_days": "INTEGER DEFAULT 0",
+                "name_en": "VARCHAR(255)",
+                "category_name": "VARCHAR(255)",
+                "regular_price": "NUMERIC(18, 2)",
+                "provider_discount_percent": "NUMERIC(7, 2)",
+                "delivery_type": "VARCHAR(30)",
+                "provider_quantity": "INTEGER",
+            },
+        )
+        ensure_columns(
+            engine,
+            "stock_movements",
+            {
+                "tracks_stock": "BOOLEAN DEFAULT 1",
+                "unit_cost": "NUMERIC(18, 2)",
+                "unit_price": "NUMERIC(18, 2)",
+                "cash_in": "NUMERIC(18, 2) DEFAULT 0",
+                "cash_out": "NUMERIC(18, 2) DEFAULT 0",
+            },
+        )
     yield
 
 
@@ -45,40 +79,47 @@ def create_app() -> FastAPI:
     app.add_middleware(MaintenanceMiddleware, is_maintenance=is_maintenance)
 
     register_exception_handlers(app)
-    _mount_routers(app)
+
+    from app.api import register_routers
+
+    register_routers(app)
+
+    # Serve file tĩnh đã upload (ảnh QR, ...).
+    upload_dir = Path("storage/uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+
+    _mount_frontend(app)
     return app
 
 
-def _mount_routers(app: FastAPI) -> None:
-    prefix = settings.api_prefix
+def _mount_frontend(app: FastAPI) -> None:
+    """Phục vụ frontend React đã build (dist/) ngay trong FastAPI.
 
-    from app.modules.auth.router import router as auth_router
-    from app.modules.auth.router import user_router
-    from app.modules.log_activities.router import router as log_router
-    from app.modules.orders.router import router as orders_router
-    from app.modules.organizations.router import router as org_router
-    from app.modules.payments.router import router as payments_router
-    from app.modules.products.router import router as products_router
-    from app.modules.settings.router import router as settings_router
-    from app.modules.suppliers.router import router as suppliers_router
-    from app.modules.users.router import router as users_router
-    from app.modules.vouchers.router import router as vouchers_router
+    Nhờ đó toàn bộ hệ thống chạy trên 1 cổng / 1 origin — không cần CORS,
+    Cloudflare Tunnel chỉ cần trỏ vào cổng này. Các route /api và /uploads
+    đã đăng ký ở trên nên được ưu tiên; mọi đường dẫn còn lại trả về
+    index.html để React Router xử lý (SPA fallback).
+    """
+    if settings.frontend_dist_dir:
+        dist = Path(settings.frontend_dist_dir)
+    else:
+        # backend/app/main.py -> backend/app -> backend -> repo -> frontend/dist
+        dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
-    @app.get(f"{prefix}/health", tags=["Health"], summary="Health check")
-    def health() -> dict:
-        return {"success": True, "message": "ok", "data": {"service": "order-nexora"}}
+    index_file = dist / "index.html"
+    if not index_file.exists():
+        return  # Chưa build frontend — bỏ qua, chỉ chạy API.
 
-    app.include_router(auth_router, prefix=prefix)
-    app.include_router(user_router, prefix=prefix)
-    app.include_router(org_router, prefix=prefix)
-    app.include_router(users_router, prefix=prefix)
-    app.include_router(log_router, prefix=prefix)
-    app.include_router(settings_router, prefix=prefix)
-    app.include_router(suppliers_router, prefix=prefix)
-    app.include_router(products_router, prefix=prefix)
-    app.include_router(payments_router, prefix=prefix)
-    app.include_router(orders_router, prefix=prefix)
-    app.include_router(vouchers_router, prefix=prefix)
+    # File tĩnh có thật (JS/CSS/ảnh) — phục vụ trực tiếp.
+    app.mount("/assets", StaticFiles(directory=str(dist / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):  # noqa: ANN202
+        candidate = dist / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(index_file))
 
 
 app = create_app()

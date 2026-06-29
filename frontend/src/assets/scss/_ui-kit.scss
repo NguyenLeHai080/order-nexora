@@ -1,0 +1,83 @@
+// ============================================================
+// UI Kit — style cho các component nguyên tử trong src/ui/.
+// Class đặt tiền tố `ui-` để tránh xung đột với bootstrap.
+// ============================================================
+@use "variables" as *;
+@use "mixins" as *;
+
+// ----- FormField: bọc label + input + helper/error -----
+.ui-field {
+  margin-bottom: 1rem;
+
+  .ui-field-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.35rem;
+
+    .ui-field-required {
+      color: $danger;
+      margin-left: 2px;
+    }
+  }
+
+  .ui-field-help {
+    font-size: 0.78rem;
+    color: $text-muted;
+    margin-top: 0.25rem;
+  }
+
+  .ui-field-error {
+    font-size: 0.78rem;
+    color: $danger;
+    margin-top: 0.25rem;
+  }
+}
+
+// ----- EmptyState: trạng thái rỗng -----
+.ui-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: $text-muted;
+
+  i {
+    font-size: 2.5rem;
+    opacity: 0.5;
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+
+  .ui-empty-title {
+    font-weight: 600;
+    color: $text;
+  }
+}
+
+// ----- Loader: vùng tải -----
+.ui-loader {
+  @include flex-center;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  color: $text-muted;
+}
+
+// ----- SectionCard: card có tiêu đề dùng trong gallery & trang -----
+.ui-section {
+  @include card-surface;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+
+  .ui-section-title {
+    @include caps-label(0.75rem);
+    margin-bottom: 1rem;
+  }
+}
+
+// Khoảng cách giữa các phần tử demo trong UI kit gallery.
+.ui-demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}

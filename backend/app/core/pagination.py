@@ -12,6 +12,7 @@ from pydantic import BaseModel
 class ListParams(BaseModel):
     search: str | None = None
     status: str | None = None
+    supplier_id: int | None = None
     from_date: date | None = None
     to_date: date | None = None
     sort_by: str = "created_at"
@@ -27,6 +28,7 @@ class ListParams(BaseModel):
 def list_params(
     search: str | None = Query(None, description="Từ khóa tìm kiếm"),
     status: str | None = Query(None, description="Lọc theo trạng thái"),
+    supplier_id: int | None = Query(None, description="Lọc theo nhà cung cấp"),
     from_date: date | None = Query(None, description="Lọc từ ngày (Y-m-d)"),
     to_date: date | None = Query(None, description="Lọc đến ngày (Y-m-d)"),
     sort_by: str = Query("created_at", max_length=50, description="Trường sắp xếp"),
@@ -38,6 +40,7 @@ def list_params(
     return ListParams(
         search=search,
         status=status,
+        supplier_id=supplier_id,
         from_date=from_date,
         to_date=to_date,
         sort_by=sort_by,

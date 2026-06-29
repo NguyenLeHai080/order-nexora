@@ -11,7 +11,9 @@ order-nexora/
 └── docs/        # Phân tích nghiệp vụ & quy ước API
 ```
 
-📄 Tài liệu: [Phân tích nghiệp vụ](docs/business-analysis.md) · [Quy ước API](docs/api-conventions.md)
+📚 **Tài liệu đầy đủ: [docs/README.md](docs/README.md)** — bắt đầu tại đây.
+
+Đọc nhanh: [Bắt đầu](docs/getting-started.md) · [Kiến trúc](docs/architecture.md) · [Backend guide](docs/backend-guide.md) · [Frontend guide](docs/frontend-guide.md) · [UI Kit](docs/ui-kit.md) · [API](docs/api/README.md) · [Nghiệp vụ](docs/business/README.md) · [Đóng góp](docs/contributing.md)
 
 ---
 
@@ -48,10 +50,13 @@ backend/app/
 ├── core/         # config, database, security(JWT), response envelope, repository, RBAC
 ├── database/     # đăng ký tập trung toàn bộ model
 ├── middleware/   # maintenance mode + ghi LogActivity
-├── modules/      # auth, users, organizations, permissions, products,
-│                 # suppliers, payments, orders, vouchers, settings, log_activities
-└── main.py       # app factory: mount router + middleware + exception handler
+├── modules/      # auth, users, permissions(roles), organizations, products, suppliers,
+│                 # payments, orders, vouchers, settings, log_activities, uploads
+├── api.py        # tập hợp & đăng ký toàn bộ router
+└── main.py       # app factory: middleware + exception handler + static files
 ```
+
+> Chi tiết kiến trúc phân lớp + hướng dẫn thêm module/API: [docs/backend-guide.md](docs/backend-guide.md).
 
 ---
 
@@ -78,10 +83,15 @@ npm run dev        # http://localhost:5173  (proxy /api -> http://localhost:8000
 ### Cấu trúc (module-based)
 ```
 frontend/src/
-├── core/      # apiClient (axios + Bearer + X-Organization-Id), authStore (zustand), ProtectedRoute
-├── layouts/   # AdminLayout (menu theo quyền)
-└── modules/   # Auth, Dashboard, UserManagement (khuôn mẫu để nhân bản)
+├── assets/     # ảnh + SCSS (partials + main.scss)
+├── components/ # component bố cục dùng chung (DataTable, Paginator, PageHeader...)
+├── core/       # apiClient (axios + Bearer + X-Organization-Id), authStore (zustand), useList, ProtectedRoute
+├── layouts/    # AdminLayout (menu theo quyền)
+├── modules/    # màn hình nghiệp vụ: mỗi module có config/hooks/helpers/components/pages
+└── ui/         # UI kit nguyên tử (Button, TextInput, SelectInput, FormField, Loader...)
 ```
+
+> Chi tiết mô hình module + hướng dẫn thêm màn hình: [docs/frontend-guide.md](docs/frontend-guide.md).
 
 ---
 
@@ -121,5 +131,6 @@ Quy ước commit: `feat: add homepage #id_issue`, `fix: resolve login bug #id_i
 ## CI/CD
 - **CI** (`.github/workflows/ci.yml`): 2 job song song — backend (ruff + pytest), frontend (typecheck + build). Chạy trên PR/push vào `dev`, `staging`, `prod`.
 - **CD** (`.github/workflows/cd.yml`): build & push Docker image backend lên GHCR khi push vào `staging`/`prod` hoặc tag `v*`.
+- **Server auto deploy**: máy Windows server có thể chạy watcher trong `ops/` để tự cập nhật khi `prod` có commit mới. Xem [docs/deployment.md](docs/deployment.md).
 
 Nhánh `prod` và `staging` được bảo vệ: chặn push trực tiếp, bắt buộc PR + 1 review + CI pass.

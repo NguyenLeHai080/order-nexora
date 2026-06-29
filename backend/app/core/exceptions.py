@@ -48,12 +48,19 @@ def register_exception_handlers(app) -> None:  # noqa: ANN001
 
     @app.exception_handler(RequestValidationError)
     async def _validation_exc(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Pydantic v2 nhét object gốc (vd ValueError từ validator) vào ctx ->
+        # không JSON-serializable. Ép str để envelope luôn trả được.
+        errors = exc.errors()
+        for err in errors:
+            ctx = err.get("ctx")
+            if isinstance(ctx, dict):
+                err["ctx"] = {k: str(v) for k, v in ctx.items()}
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "success": False,
                 "message": "Dữ liệu không hợp lệ.",
-                "errors": exc.errors(),
+                "errors": errors,
                 "data": None,
             },
         )
