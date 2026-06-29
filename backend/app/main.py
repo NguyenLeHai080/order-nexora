@@ -132,12 +132,22 @@ def _mount_frontend(app: FastAPI) -> None:
     # File tĩnh có thật (JS/CSS/ảnh) — phục vụ trực tiếp.
     app.mount("/assets", StaticFiles(directory=str(dist / "assets")), name="assets")
 
+    def _index_response() -> FileResponse:
+        return FileResponse(
+            str(index_file),
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):  # noqa: ANN202
         candidate = dist / full_path
         if full_path and candidate.is_file():
             return FileResponse(str(candidate))
-        return FileResponse(str(index_file))
+        return _index_response()
 
 
 app = create_app()
