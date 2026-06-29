@@ -1,0 +1,12 @@
+# Loại khỏi build context để image gọn & build nhanh
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.db
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+.git/
