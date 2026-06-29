@@ -70,6 +70,7 @@ backend/storage/
 ops/.last-prod-*
 ops/*.lock
 ops/watchdog.pid
+ops/postgres-credentials.txt
 backups/
 ops/logs-archive/
 

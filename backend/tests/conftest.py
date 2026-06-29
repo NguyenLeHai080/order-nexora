@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 # Dùng DB tạm riêng cho test, không đụng DB dev.
 _tmp_db = os.path.join(tempfile.gettempdir(), "order_nexora_test.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp_db}"
+os.environ["TRUSTED_HOSTS"] = '["testserver","localhost","127.0.0.1"]'
 
 
 @pytest.fixture(scope="session", autouse=True)
