@@ -11,7 +11,7 @@ $Python    = Join-Path $Backend '.venv\Scripts\python.exe'
 $TokenFile = Join-Path $env:USERPROFILE '.cloudflared\token.txt'
 $LogFile   = Join-Path $Root 'ops\watchdog.log'
 $PidFile   = Join-Path $Root 'ops\watchdog.pid'
-$WorkerCount = 2
+$WorkerCount = 1
 
 function Write-Log($msg) {
     $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'

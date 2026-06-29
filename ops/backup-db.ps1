@@ -36,12 +36,17 @@ if ($databaseUrl.StartsWith('sqlite')) {
     Copy-Item -LiteralPath $dbPath -Destination $dest -Force
     Write-Output "Backup created: $dest"
 } elseif ($databaseUrl.StartsWith('postgresql')) {
-    if (-not (Get-Command pg_dump -ErrorAction SilentlyContinue)) {
+    $pgDump = (Get-Command pg_dump -ErrorAction SilentlyContinue)
+    if (-not $pgDump -and (Test-Path 'D:\ProgramFiles\PostgreSQL\17\bin\pg_dump.exe')) {
+        $pgDump = Get-Item 'D:\ProgramFiles\PostgreSQL\17\bin\pg_dump.exe'
+    }
+    if (-not $pgDump) {
         throw 'pg_dump not found. Install PostgreSQL client tools or run backup on the DB host.'
     }
 
     $dest = Join-Path $BackupDir "order_nexora-postgres-$stamp.dump"
-    & pg_dump --format=custom --file=$dest $databaseUrl
+    $pgDumpUrl = $databaseUrl -replace '^postgresql\+[^:]+://', 'postgresql://'
+    & $pgDump.FullName --format=custom --file=$dest $pgDumpUrl
     if ($LASTEXITCODE -ne 0) {
         throw "pg_dump failed with exit code $LASTEXITCODE"
     }

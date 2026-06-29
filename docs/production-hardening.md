@@ -26,6 +26,25 @@ DB_POOL_RECYCLE_SECONDS=1800
 
 Máy server hiện chưa có PostgreSQL client tools (`psql`, `pg_dump`) và chưa có Docker, nên cần cài PostgreSQL riêng trước khi chuyển DB thật.
 
+Server hiện tại đã chuyển sang PostgreSQL local:
+
+- Service: `postgresql-x64-17`
+- Database: `order_nexora`
+- App user: `order_nexora_app`
+- Credential riêng của server: `ops/postgres-credentials.txt` (đã ignore khỏi Git)
+- App config thật: `backend/.env` (đã ignore khỏi Git)
+
+Migration từ SQLite sang PostgreSQL dùng:
+
+```powershell
+.\backend\.venv\Scripts\python.exe .\ops\migrate-sqlite-to-postgres.py `
+  --sqlite-path .\backend\order_nexora.db `
+  --postgres-url "postgresql+psycopg://order_nexora_app:<password>@127.0.0.1:5432/order_nexora" `
+  --truncate
+```
+
+Trong lần chuyển đầu tiên có 1 invoice cũ bị bỏ qua vì trỏ tới `order_id` không còn tồn tại trong bảng `orders`. PostgreSQL chặn đúng ràng buộc FK, còn SQLite trước đó cho phép dữ liệu mồ côi.
+
 ## Backup
 
 Chạy backup thủ công:
