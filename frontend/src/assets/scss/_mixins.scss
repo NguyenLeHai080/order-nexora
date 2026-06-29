@@ -1,0 +1,35 @@
+// ============================================================
+// Mixins & hàm tiện ích dùng lại trong các partial.
+// ============================================================
+@use "sass:color";
+@use "variables" as *;
+
+// Căn giữa bằng flex.
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Nhãn dạng chữ in hoa nhỏ (dùng cho label thẻ, tiêu đề cột bảng).
+@mixin caps-label($size: 0.72rem) {
+  text-transform: uppercase;
+  font-size: $size;
+  letter-spacing: 0.04em;
+  color: $text-muted;
+  font-weight: 600;
+}
+
+// Nền "soft" cho badge/icon theo màu chủ đạo (nền nhạt + chữ đậm màu).
+@mixin soft-variant($color) {
+  background: color.adjust($color, $lightness: 38%, $space: hsl);
+  color: $color;
+}
+
+// Thẻ trắng bo góc + đổ bóng nhẹ.
+@mixin card-surface {
+  background: $surface;
+  border: none;
+  border-radius: $radius;
+  box-shadow: $shadow-card;
+}

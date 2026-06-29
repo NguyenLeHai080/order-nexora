@@ -1,0 +1,20 @@
+// ============================================================
+// Base — reset nhẹ & style mặc định cho thẻ gốc.
+// ============================================================
+@use "variables" as *;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: $font-family-base;
+  background: $body-bg;
+  color: $text;
+  font-size: $font-size-base;
+}
+
+a {
+  text-decoration: none;
+}
