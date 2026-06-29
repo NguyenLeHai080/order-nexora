@@ -114,12 +114,13 @@ try {
 
     $frontend = Join-Path $Root 'frontend'
     if (Test-Path (Join-Path $frontend 'package.json')) {
+        $npm = 'npm.cmd'
         if (Test-Path (Join-Path $frontend 'package-lock.json')) {
-            Invoke-Logged 'npm' @('ci') $frontend
+            Invoke-Logged $npm @('ci') $frontend
         } else {
-            Invoke-Logged 'npm' @('install') $frontend
+            Invoke-Logged $npm @('install') $frontend
         }
-        Invoke-Logged 'npm' @('run', 'build') $frontend
+        Invoke-Logged $npm @('run', 'build') $frontend
     }
 
     Stop-PortProcess 8000
