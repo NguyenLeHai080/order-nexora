@@ -10,6 +10,8 @@ $Backend   = Join-Path $Root 'backend'
 $Python    = Join-Path $Backend '.venv\Scripts\python.exe'
 $TokenFile = Join-Path $env:USERPROFILE '.cloudflared\token.txt'
 $LogFile   = Join-Path $Root 'ops\watchdog.log'
+$PidFile   = Join-Path $Root 'ops\watchdog.pid'
+$WorkerCount = 2
 
 function Write-Log($msg) {
     $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
@@ -25,14 +27,43 @@ function Test-Cloudflared {
     return [bool](Get-Process -Name 'cloudflared' -ErrorAction SilentlyContinue)
 }
 
+function Stop-IfDuplicateWatchdog {
+    if (-not (Test-Path $PidFile)) {
+        return
+    }
+
+    $oldPid = (Get-Content -Path $PidFile -Raw -ErrorAction SilentlyContinue).Trim()
+    if ($oldPid -and $oldPid -ne "$PID") {
+        $oldProcess = Get-Process -Id ([int]$oldPid) -ErrorAction SilentlyContinue
+        if ($oldProcess) {
+            Write-Log "another watchdog is already running (pid $oldPid), exiting pid $PID"
+            exit 0
+        }
+    }
+}
+
+function Remove-StaleBackendProcesses {
+    $listeners = Get-NetTCPConnection -State Listen -LocalPort 8000 -ErrorAction SilentlyContinue
+    foreach ($conn in $listeners) {
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $($conn.OwningProcess)" -ErrorAction SilentlyContinue
+        if ($proc -and $proc.CommandLine -notlike "*$Backend*") {
+            Write-Log "stopping stale backend pid $($conn.OwningProcess)"
+            Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Stop-IfDuplicateWatchdog
+Set-Content -Path $PidFile -Value $PID -Encoding ascii
 Write-Log "watchdog started (pid $PID)"
 
 while ($true) {
     # --- Backend uvicorn :8000 ---
     if (-not (Test-Port 8000)) {
+        Remove-StaleBackendProcesses
         Write-Log "backend down -> starting uvicorn :8000"
         Start-Process -FilePath $Python `
-            -ArgumentList '-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8000' `
+            -ArgumentList '-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8000','--proxy-headers','--forwarded-allow-ips','*','--workers',"$WorkerCount" `
             -WorkingDirectory $Backend -WindowStyle Hidden
         Start-Sleep -Seconds 5
     }

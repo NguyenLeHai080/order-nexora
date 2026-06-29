@@ -1,6 +1,7 @@
 param(
     [string]$Root = 'D:\Projects\order-nexora',
     [string]$Branch = 'prod',
+    [switch]$InstallDevDependencies,
     [switch]$Force
 )
 
@@ -107,8 +108,9 @@ try {
         Invoke-Logged 'python' @('-m', 'venv', '.venv') $backend
     }
 
+    Invoke-Logged $venvPython @('-m', 'pip', 'install', '--upgrade', 'pip') $backend
     Invoke-Logged $venvPython @('-m', 'pip', 'install', '-r', 'requirements.txt') $backend
-    if (Test-Path (Join-Path $backend 'requirements-dev.txt')) {
+    if ($InstallDevDependencies -and (Test-Path (Join-Path $backend 'requirements-dev.txt'))) {
         Invoke-Logged $venvPython @('-m', 'pip', 'install', '-r', 'requirements-dev.txt') $backend
     }
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,7 +21,8 @@ from app.middleware.logging import LogActivityMiddleware, MaintenanceMiddleware
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Tạo bảng nếu chưa có (dev). Production dùng Alembic migration.
-    Base.metadata.create_all(bind=engine)
+    if settings.auto_create_tables:
+        Base.metadata.create_all(bind=engine)
     # Dev: thêm cột mới còn thiếu vào bảng cũ (create_all không ALTER).
     if settings.app_env not in {"prod", "production"}:
         from app.core.dev_migrate import ensure_columns
@@ -64,6 +66,7 @@ def create_app() -> FastAPI:
     )
 
     # CORS cho frontend React.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
