@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
-    trusted_hosts: list[str] = ["*"]
+    trusted_hosts: list[str] = ["*", "testserver"]
 
     # Frontend build (SPA) — để FastAPI phục vụ luôn file tĩnh đã build.
     # Rỗng = tự dò ../frontend/dist so với mã nguồn backend.
