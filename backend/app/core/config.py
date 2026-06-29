@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     # Database — mặc định SQLite cho dev, đổi sang Postgres qua DATABASE_URL
     database_url: str = "sqlite:///./order_nexora.db"
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle_seconds: int = 1800
+    auto_create_tables: bool = True
 
     # JWT
     jwt_secret: str = "change-me-in-production"
@@ -24,6 +28,7 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    trusted_hosts: list[str] = ["*"]
 
     # Frontend build (SPA) — để FastAPI phục vụ luôn file tĩnh đã build.
     # Rỗng = tự dò ../frontend/dist so với mã nguồn backend.
