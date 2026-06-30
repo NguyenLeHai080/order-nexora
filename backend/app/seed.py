@@ -114,6 +114,9 @@ def seed() -> None:
         # 5) Nhà cung cấp mẫu + sản phẩm mẫu (để FE có dữ liệu hiển thị ngay).
         _seed_catalog(db, org.id)
 
+        # 5a) Backfill danh mục: tạo Category từ category_name cũ + gắn category_id.
+        _backfill_categories(db, org.id)
+
         # 5b) Tài khoản ngân hàng nhận tiền + ví chủ + cấu hình Zalo xử lý đơn tay.
         _seed_payments(db, org.id, admin.id)
 
@@ -209,6 +212,56 @@ def _seed_catalog(db, org_id: int) -> None:
                 )
             )
     db.commit()
+
+
+def _backfill_categories(db, org_id: int) -> None:
+    """Tạo Category từ `category_name` cũ và gắn `category_id` cho sản phẩm.
+
+    Idempotent: chỉ tạo danh mục còn thiếu (get-or-create theo (org, name)) và
+    chỉ gán category_id cho sản phẩm có category_name nhưng chưa link. Dùng để
+    đồng bộ dữ liệu đã sync trước khi có module Danh mục (sync mới đã tự link).
+    """
+    from app.modules.categories.models import Category
+    from app.modules.organizations.utils import slugify
+    from app.modules.products.models import Product
+
+    # Cache danh mục hiện có theo tên (lower) để tránh truy vấn lặp.
+    existing = db.scalars(select(Category).where(Category.organization_id == org_id)).all()
+    by_name: dict[str, Category] = {c.name.strip().lower(): c for c in existing}
+
+    products = db.scalars(
+        select(Product).where(
+            Product.organization_id == org_id,
+            Product.category_name.isnot(None),
+            Product.category_id.is_(None),
+        )
+    ).all()
+
+    created = 0
+    linked = 0
+    for p in products:
+        name = (p.category_name or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        category = by_name.get(key)
+        if category is None:
+            category = Category(
+                name=name,
+                slug=slugify(name) or key,
+                organization_id=org_id,
+                status="active",
+            )
+            db.add(category)
+            db.flush()  # cần id để gán
+            by_name[key] = category
+            created += 1
+        p.category_id = category.id
+        linked += 1
+
+    db.commit()
+    if created or linked:
+        print(f"Backfill danh muc: tao moi {created}, gan category_id cho {linked} san pham")
 
 
 def _seed_payments(db, org_id: int, admin_id: int) -> None:
