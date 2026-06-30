@@ -16,6 +16,7 @@ _SUBJECTS = [
     "log-activities",
     "settings",
     "suppliers",
+    "categories",
     "products",
     "payments",
     "orders",
@@ -37,6 +38,13 @@ def seed() -> None:
     import app.database  # noqa: F401 — đăng ký model
 
     Base.metadata.create_all(bind=engine)
+    # Thêm cột mới còn thiếu cho DB dev cũ (SQLite). No-op trên Postgres.
+    # Chạy ở đây để seed không phụ thuộc APP_ENV — lifespan app skip migrate khi prod.
+    from app.core.dev_migrate import ensure_dev_schema
+
+    added = ensure_dev_schema(engine)
+    if added:
+        print("Đã thêm cột thiếu:", added)
     db = SessionLocal()
     try:
         from app.modules.organizations.models import Organization
@@ -106,6 +114,9 @@ def seed() -> None:
         # 5) Nhà cung cấp mẫu + sản phẩm mẫu (để FE có dữ liệu hiển thị ngay).
         _seed_catalog(db, org.id)
 
+        # 5b) Tài khoản ngân hàng nhận tiền + ví chủ + cấu hình Zalo xử lý đơn tay.
+        _seed_payments(db, org.id, admin.id)
+
         # 6) Cấu hình mặc định (chỉ tạo nếu chưa có — không ghi đè giá trị admin đã đặt).
         from app.modules.settings import service as settings_service
 
@@ -113,8 +124,8 @@ def seed() -> None:
             settings_service.set_value(
                 db,
                 settings_service.DEFAULT_MARKUP_KEY,
-                "20",
-                "% markup mặc định áp cho sản phẩm mới khi đồng bộ NCC",
+                "0",
+                "% markup cộng thêm mặc định cho sản phẩm mới khi đồng bộ NCC (0 = bán đúng giá niêm yết)",
             )
         if settings_service.get_value(db, settings_service.MANUAL_FULFILLMENT_ZALO_NAME_KEY) is None:
             settings_service.set_value(
@@ -166,15 +177,16 @@ def _seed_catalog(db, org_id: int) -> None:
         db.commit()
         db.refresh(supplier)
 
-    # base_price = giá NCC (giá vốn); markup_percent = % cộng thêm để ra giá bán.
+    # base_price = giá CTV/vốn (phải trả NCC); regular_price = giá niêm yết (giá bán cho khách).
+    # markup_percent = 0 → giá bán đúng giá niêm yết; lợi nhuận/sp = regular_price − base_price.
     samples = [
-        ("ChatGPT Plus 1 tháng", "prod_demo_chatgpt", Decimal("350000"), Decimal("25")),
-        ("Spotify Premium 1 năm", "prod_demo_spotify", Decimal("180000"), Decimal("30")),
-        ("Canva Pro 1 năm", "prod_demo_canva", Decimal("120000"), Decimal("40")),
-        ("Netflix Premium 1 tháng", "prod_demo_netflix", Decimal("90000"), Decimal("35")),
-        ("YouTube Premium 1 năm", "prod_demo_youtube", Decimal("250000"), Decimal("28")),
+        ("ChatGPT Plus 1 tháng", "prod_demo_chatgpt", Decimal("350000"), Decimal("437500")),
+        ("Spotify Premium 1 năm", "prod_demo_spotify", Decimal("180000"), Decimal("234000")),
+        ("Canva Pro 1 năm", "prod_demo_canva", Decimal("120000"), Decimal("168000")),
+        ("Netflix Premium 1 tháng", "prod_demo_netflix", Decimal("90000"), Decimal("121500")),
+        ("YouTube Premium 1 năm", "prod_demo_youtube", Decimal("250000"), Decimal("320000")),
     ]
-    for name, ext_id, base_price, markup in samples:
+    for name, ext_id, base_price, regular_price in samples:
         exists = db.scalars(
             select(Product).where(
                 Product.supplier_id == supplier.id, Product.external_id == ext_id
@@ -188,7 +200,8 @@ def _seed_catalog(db, org_id: int) -> None:
                     supplier_id=supplier.id,
                     external_id=ext_id,
                     base_price=base_price,
-                    markup_percent=markup,
+                    regular_price=regular_price,
+                    markup_percent=Decimal("0.00"),
                     markup_amount=Decimal("0.00"),
                     stock_status="in_stock",
                     status="active",
@@ -196,6 +209,58 @@ def _seed_catalog(db, org_id: int) -> None:
                 )
             )
     db.commit()
+
+
+def _seed_payments(db, org_id: int, admin_id: int) -> None:
+    """Tài khoản ngân hàng nhận tiền + ví chủ (admin) + cấu hình Zalo xử lý đơn tay.
+
+    - BankAccount: VietinBank của chủ shop. bank_name PHẢI là định danh VietQR
+      ("VietinBank") vì `payments.service.build_vietqr_url` dùng nó để dựng link
+      QR động (kèm số tiền) lúc khách nạp. qr_image_url là QR tĩnh (không số tiền)
+      lấy thẳng từ img.vietqr.io — luôn quét được, không cần tải file về.
+    - Ví chủ: owner_wallet_user_id = admin -> lãi mỗi đơn cộng vào ví này.
+    - Zalo: đơn MANUAL hiển thị tên + link Zalo để khách liên hệ nhân viên.
+    """
+    from urllib.parse import quote
+
+    from app.modules.payments.models import BankAccount
+    from app.modules.settings import service as settings_service
+
+    bank_name = "VietinBank"  # định danh VietQR — KHÔNG đổi thành tên có chi nhánh.
+    account_number = "109873538727"
+    account_holder = "NGUYEN LE HAI"
+
+    bank = db.scalars(
+        select(BankAccount).where(BankAccount.account_number == account_number)
+    ).first()
+    if bank is None:
+        static_qr = (
+            f"https://img.vietqr.io/image/{bank_name}-{account_number}-compact.png"
+            f"?accountName={quote(account_holder)}"
+        )
+        bank = BankAccount(
+            bank_name=bank_name,
+            account_number=account_number,
+            account_holder=account_holder,
+            qr_image_url=static_qr,
+            status="active",
+            organization_id=org_id,
+        )
+        db.add(bank)
+        db.commit()
+
+    # Ví chủ nhận lãi: mặc định là admin (nếu admin chưa cấu hình tay).
+    if settings_service.get_value(db, settings_service.OWNER_WALLET_USER_ID_KEY) is None:
+        settings_service.set_value(
+            db,
+            settings_service.OWNER_WALLET_USER_ID_KEY,
+            str(admin_id),
+            "User nhận lãi mỗi đơn (ví chủ shop)",
+        )
+
+    # Link/QR Zalo cho đơn MANUAL: KHÔNG seed số liên hệ giả. Admin tự nhập
+    # `manual_fulfillment_zalo_url` và upload ảnh QR Zalo (-> manual_fulfillment_qr_url)
+    # qua trang Cấu hình. Modal đơn hàng tự ẩn phần liên hệ nếu chưa có.
 
 
 if __name__ == "__main__":

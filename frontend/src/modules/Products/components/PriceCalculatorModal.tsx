@@ -9,6 +9,7 @@ import {
   computeUnitProfit,
   computeMargin,
   percentFromTargetPrice,
+  listPrice,
 } from '../helpers/pricing';
 
 interface Props {
@@ -32,6 +33,7 @@ export default function PriceCalculatorModal({ show, product, onClose, onSaved }
   const [saving, setSaving] = useState(false);
 
   const basePrice = product?.base_price ?? '0';
+  const regularPrice = product?.regular_price ?? null;
 
   function handleEnter() {
     setMarkupPercent(product?.markup_percent ?? '0');
@@ -40,13 +42,13 @@ export default function PriceCalculatorModal({ show, product, onClose, onSaved }
     setError(null);
   }
 
-  const sale = computeSalePrice(basePrice, markupPercent, markupAmount);
-  const profit = computeUnitProfit(basePrice, markupPercent, markupAmount);
-  const margin = computeMargin(basePrice, markupPercent, markupAmount);
+  const sale = computeSalePrice(basePrice, regularPrice, markupPercent, markupAmount);
+  const profit = computeUnitProfit(basePrice, regularPrice, markupPercent, markupAmount);
+  const margin = computeMargin(basePrice, regularPrice, markupPercent, markupAmount);
 
   // Nhập giá bán mong muốn -> suy ngược % (đặt cố định về 0 cho gọn).
   function applyTargetPrice() {
-    const pct = percentFromTargetPrice(basePrice, targetPrice);
+    const pct = percentFromTargetPrice(basePrice, regularPrice, targetPrice);
     setMarkupPercent(pct.toFixed(2));
     setMarkupAmount('0');
   }
@@ -83,12 +85,21 @@ export default function PriceCalculatorModal({ show, product, onClose, onSaved }
           {error && <div className="alert alert-danger">{error}</div>}
 
           {/* Giá nhà cung cấp (chỉ đọc) */}
-          <div className="alert alert-secondary d-flex justify-content-between align-items-center">
+          <div className="alert alert-secondary d-flex justify-content-between align-items-center mb-2">
             <span>
               <i className="bi bi-truck me-2" />
-              Giá nhà cung cấp (giá vốn)
+              Giá nhập NCC (giá vốn / CTV)
             </span>
             <strong className="fs-5">{formatCurrency(basePrice)}</strong>
+          </div>
+
+          {/* Giá niêm yết NCC (gốc tính giá bán) */}
+          <div className="alert alert-light border d-flex justify-content-between align-items-center">
+            <span>
+              <i className="bi bi-tag me-2" />
+              Giá niêm yết NCC (gốc tính giá bán)
+            </span>
+            <strong className="fs-5">{formatCurrency(listPrice(basePrice, regularPrice))}</strong>
           </div>
 
           <Row className="g-3">

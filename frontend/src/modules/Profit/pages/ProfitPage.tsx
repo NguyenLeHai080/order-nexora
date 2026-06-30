@@ -26,7 +26,7 @@ export default function ProfitPage() {
 
   return (
     <>
-      <PageHeader title="Lợi nhuận" breadcrumb="Kinh doanh > Lợi nhuận" />
+      <PageHeader title="Lợi nhuận" breadcrumb="Kinh doanh > Lợi nhuận" infoKey="profit" />
 
       <Row className="g-2 align-items-end mb-3">
         <Col md={3}>

@@ -7,6 +7,7 @@ import UserListPage from './modules/Users/pages/UserListPage';
 import RoleListPage from './modules/Roles/pages/RoleListPage';
 import OrganizationListPage from './modules/Organizations/pages/OrganizationListPage';
 import ProductListPage from './modules/Products/pages/ProductListPage';
+import CategoryListPage from './modules/Categories/pages/CategoryListPage';
 import SupplierListPage from './modules/Suppliers/pages/SupplierListPage';
 import OrderListPage from './modules/Orders/pages/OrderListPage';
 import ProfitPage from './modules/Profit/pages/ProfitPage';
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="roles" element={<ProtectedRoute permission="roles.index"><RoleListPage /></ProtectedRoute>} />
           <Route path="organizations" element={<ProtectedRoute permission="organizations.index"><OrganizationListPage /></ProtectedRoute>} />
           <Route path="products" element={<ProtectedRoute permission="products.index"><ProductListPage /></ProtectedRoute>} />
+          <Route path="categories" element={<ProtectedRoute permission="categories.index"><CategoryListPage /></ProtectedRoute>} />
           <Route path="inventory" element={<ProtectedRoute permission="inventory.index"><InventoryListPage /></ProtectedRoute>} />
           <Route path="suppliers" element={<ProtectedRoute permission="suppliers.index"><SupplierListPage /></ProtectedRoute>} />
           <Route path="orders" element={<ProtectedRoute permission="orders.index"><OrderListPage /></ProtectedRoute>} />

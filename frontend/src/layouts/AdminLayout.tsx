@@ -22,6 +22,7 @@ const MENU: { section: string; items: MenuItem[] }[] = [
     section: 'Quản lý kho hàng',
     items: [
       { to: '/products', label: 'Sản phẩm & Kho', icon: 'bi-box-seam', can: { action: 'index', subject: 'Product' } },
+      { to: '/categories', label: 'Danh mục sản phẩm', icon: 'bi-tags', can: { action: 'index', subject: 'Categorie' } },
       { to: '/inventory', label: 'Tồn kho (sổ kho)', icon: 'bi-clipboard-data', can: { action: 'index', subject: 'Inventory' } },
       { to: '/suppliers', label: 'Nhà cung cấp kho', icon: 'bi-truck', can: { action: 'index', subject: 'Supplier' } },
       { to: '/integrations', label: 'NCC & Tích hợp API', icon: 'bi-plugin', can: { action: 'index', subject: 'Partner' } },

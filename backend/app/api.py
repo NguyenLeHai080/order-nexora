@@ -25,6 +25,7 @@ def _collect_routers() -> list[APIRouter]:
     """
     from app.modules.auth.router import router as auth_router
     from app.modules.auth.router import user_router
+    from app.modules.categories.router import router as categories_router
     from app.modules.inventory.router import router as inventory_router
     from app.modules.invoices.router import router as invoices_router
     from app.modules.log_activities.router import router as log_router
@@ -53,6 +54,7 @@ def _collect_routers() -> list[APIRouter]:
         log_router,
         settings_router,
         suppliers_router,
+        categories_router,
         products_router,
         inventory_router,
         payments_router,

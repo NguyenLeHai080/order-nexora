@@ -25,50 +25,9 @@ async def lifespan(_app: FastAPI):
         Base.metadata.create_all(bind=engine)
     # Dev: thêm cột mới còn thiếu vào bảng cũ (create_all không ALTER).
     if settings.app_env not in {"prod", "production"}:
-        from app.core.dev_migrate import ensure_columns
+        from app.core.dev_migrate import ensure_dev_schema
 
-        ensure_columns(engine, "suppliers", {"config": "JSON"})
-        ensure_columns(
-            engine,
-            "products",
-            {
-                "quantity": "INTEGER DEFAULT 0",
-                "low_stock_threshold": "INTEGER DEFAULT 0",
-                "warranty_days": "INTEGER DEFAULT 0",
-                "name_en": "VARCHAR(255)",
-                "category_name": "VARCHAR(255)",
-                "regular_price": "NUMERIC(18, 2)",
-                "provider_discount_percent": "NUMERIC(7, 2)",
-                "delivery_type": "VARCHAR(30)",
-                "provider_quantity": "INTEGER",
-            },
-        )
-        ensure_columns(
-            engine,
-            "stock_movements",
-            {
-                "tracks_stock": "BOOLEAN DEFAULT 1",
-                "unit_cost": "NUMERIC(18, 2)",
-                "unit_price": "NUMERIC(18, 2)",
-                "cash_in": "NUMERIC(18, 2) DEFAULT 0",
-                "cash_out": "NUMERIC(18, 2) DEFAULT 0",
-            },
-        )
-        ensure_columns(
-            engine,
-            "orders",
-            {
-                "supplier_id": "INTEGER",
-                "supplier_payable": "NUMERIC(18, 2) DEFAULT 0",
-                "owner_user_id": "INTEGER",
-                "owner_profit": "NUMERIC(18, 2) DEFAULT 0",
-                "fulfillment_type": "VARCHAR(30)",
-                "manual_fulfillment_required": "BOOLEAN DEFAULT 0",
-                "manual_contact_name": "VARCHAR(255)",
-                "manual_contact_url": "TEXT",
-                "manual_qr_image_url": "TEXT",
-            },
-        )
+        ensure_dev_schema(engine)
     yield
 
 

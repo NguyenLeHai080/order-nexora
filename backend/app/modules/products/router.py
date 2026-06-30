@@ -12,7 +12,13 @@ from app.modules.auth.dependencies import require
 from app.modules.organizations.utils import slugify
 from app.modules.products.models import Product
 from app.modules.products.repository import ProductRepository
-from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate
+from app.modules.products.schemas import (
+    ApplyMarkupRequest,
+    ProductCreate,
+    ProductOut,
+    ProductUpdate,
+)
+from app.modules.settings import service as settings_service
 from app.modules.suppliers.models import Supplier
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -44,6 +50,41 @@ def index(
     items, total = ProductRepository(db).paginate(params, organization_id=ctx.organization_id)
     names = _supplier_names(db, items)
     return paginated([_out(i, names) for i in items], total, params.page, params.limit)
+
+
+@router.post("/apply-markup", summary="Áp markup hàng loạt cho sản phẩm")
+def apply_markup(
+    body: ApplyMarkupRequest,
+    ctx: RequestContext = Depends(require("products.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Đặt giá bán cho nhiều sản phẩm cùng lúc bằng % markup trên giá gốc (NCC).
+
+    Mặc định chỉ áp cho sản phẩm CHƯA từng đặt giá (markup_percent=0 và
+    markup_amount=0) — dùng để "kích hoạt lãi" cho catalog vừa đồng bộ về mà giữ
+    nguyên giá admin đã chỉnh tay. markup_percent bỏ trống -> dùng default_markup_percent.
+    """
+    markup = body.markup_percent
+    if markup is None:
+        markup = settings_service.get_default_markup_percent(db)
+
+    stmt = select(Product)
+    if ctx.organization_id is not None:
+        stmt = stmt.where(Product.organization_id == ctx.organization_id)
+    if body.only_unpriced:
+        stmt = stmt.where(
+            Product.markup_percent == 0,
+            Product.markup_amount == 0,
+        )
+
+    products = db.scalars(stmt).all()
+    for p in products:
+        p.markup_percent = markup
+    db.commit()
+    return success(
+        {"updated": len(products), "markup_percent": str(markup)},
+        f"Đã áp markup {markup}% cho {len(products)} sản phẩm.",
+    )
 
 
 @router.get("/{product_id}", summary="Chi tiết sản phẩm")
