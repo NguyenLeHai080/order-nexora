@@ -80,6 +80,30 @@ export default function ProfitPage() {
         </Col>
       </Row>
 
+      <h6 className="fw-semibold text-muted mb-2">
+        <i className="bi bi-box-seam me-1" />
+        Dòng tiền kho hàng (tiền mặt — gồm cả tiền nhập hàng tồn chưa bán)
+      </h6>
+      <Row className="g-3 mb-4">
+        <Col md={3} sm={6}>
+          <StatCard label="Tổng thu (sổ kho)" value={formatCurrency(summary?.ledger_cash_in ?? 0)} icon="bi-arrow-down-circle" color="info" />
+        </Col>
+        <Col md={3} sm={6}>
+          <StatCard label="Tổng chi (sổ kho)" value={formatCurrency(summary?.ledger_cash_out ?? 0)} icon="bi-arrow-up-circle" color="secondary" />
+        </Col>
+        <Col md={3} sm={6}>
+          <StatCard label="Tiền nhập hàng" value={formatCurrency(summary?.stock_in_cost ?? 0)} icon="bi-box-arrow-in-down" color="warning" />
+        </Col>
+        <Col md={3} sm={6}>
+          <StatCard
+            label="Dòng tiền ròng"
+            value={formatCurrency(summary?.net_cashflow ?? 0)}
+            icon="bi-cash-coin"
+            color={parseFloat(summary?.net_cashflow ?? '0') >= 0 ? 'success' : 'danger'}
+          />
+        </Col>
+      </Row>
+
       <DataTable columns={columns} rows={byProduct} loading={loading} />
     </>
   );

@@ -14,6 +14,9 @@ MANUAL_FULFILLMENT_ZALO_NAME_KEY = "manual_fulfillment_zalo_name"
 MANUAL_FULFILLMENT_ZALO_URL_KEY = "manual_fulfillment_zalo_url"
 MANUAL_FULFILLMENT_QR_URL_KEY = "manual_fulfillment_qr_url"
 MANUAL_FULFILLMENT_INSTRUCTIONS_KEY = "manual_fulfillment_instructions"
+# Org có catalog hiển thị trên landing page công khai (API /public). Nếu chưa cấu
+# hình, public router fallback về org đầu tiên có sản phẩm active.
+PUBLIC_ORG_ID_KEY = "public_org_id"
 
 
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
@@ -70,3 +73,27 @@ def get_manual_fulfillment_config(db: Session) -> dict[str, str | None]:
             "Don nay can nhan vien xu ly thu cong. Vui long quet Zalo hoac lien he nhan vien de duoc giao hang.",
         ),
     }
+
+
+def get_public_org_id(db: Session) -> int | None:
+    """Org có catalog hiển thị trên landing công khai.
+
+    Ưu tiên Setting `public_org_id`; nếu chưa cấu hình hoặc không hợp lệ, fallback
+    về organization_id của sản phẩm active đầu tiên (org có catalog đã đồng bộ).
+    Trả None nếu hệ thống chưa có sản phẩm nào — public API sẽ trả danh sách rỗng.
+    """
+    raw = get_value(db, PUBLIC_ORG_ID_KEY, None)
+    if raw:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            pass
+
+    # Fallback: org của sản phẩm active đầu tiên.
+    from app.modules.products.models import Product
+
+    return db.scalars(
+        select(Product.organization_id)
+        .where(Product.status == "active", Product.organization_id.isnot(None))
+        .limit(1)
+    ).first()

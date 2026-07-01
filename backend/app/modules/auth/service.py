@@ -87,6 +87,64 @@ def switch_organization(db: Session, user: User, organization_id: int) -> dict:
     }
 
 
+def register(db: Session, name: str, email: str, password: str, user_name: str | None = None) -> dict:
+    """Khách tự đăng ký từ landing.
+
+    BẢO MẬT: luôn tạo tài khoản quyền thấp — chỉ gán role 'user' ("Khách hàng",
+    quyền products.index/show). KHÔNG bao giờ gán admin/ctv. Gán user vào org công
+    khai (public_org_id) để đơn hàng/quyền hoạt động. Trả session để FE auto-login.
+    """
+    from app.modules.permissions.models import Role
+    from app.modules.settings import service as settings_service
+    from app.modules.users.models import User as UserModel
+    from app.modules.users.models import UserRole, organization_user
+
+    email = email.strip().lower()
+    # Chặn trùng email / user_name.
+    if db.scalars(select(UserModel).where(UserModel.email == email)).first():
+        raise AppException("Email đã được sử dụng.", 422)
+    if user_name and db.scalars(select(UserModel).where(UserModel.user_name == user_name)).first():
+        raise AppException("Tên đăng nhập đã tồn tại.", 422)
+
+    user = UserModel(
+        name=name.strip(),
+        email=email,
+        user_name=user_name,
+        password=hash_password(password),
+        status="active",
+    )
+    db.add(user)
+    db.flush()  # cần user.id
+
+    # Gán role 'user' (quyền thấp). Nếu seed chưa có thì tạo tối thiểu.
+    role = db.scalars(select(Role).where(Role.name == "user")).first()
+    if role is None:
+        role = Role(name="user", description="Khách hàng")
+        db.add(role)
+        db.flush()
+
+    org_id = settings_service.get_public_org_id(db)
+    if org_id is not None:
+        # Cho phép user truy cập org công khai + gán role trong org đó.
+        already = db.execute(
+            select(organization_user.c.user_id).where(
+                organization_user.c.user_id == user.id,
+                organization_user.c.organization_id == org_id,
+            )
+        ).first()
+        if not already:
+            db.execute(organization_user.insert().values(organization_id=org_id, user_id=user.id))
+        db.add(UserRole(user_id=user.id, role_id=role.id, organization_id=org_id))
+    else:
+        # Chưa cấu hình org công khai: gán role global để vẫn đăng nhập/mua được.
+        db.add(UserRole(user_id=user.id, role_id=role.id, organization_id=None))
+
+    db.commit()
+
+    # Auto-login: trả session giống login.
+    return login(db, email, password)
+
+
 def forgot_password(db: Session, email: str) -> None:
     user = db.scalars(select(User).where(User.email == email)).first()
     if user:

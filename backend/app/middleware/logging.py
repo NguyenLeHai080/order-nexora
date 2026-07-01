@@ -3,8 +3,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-# Các đường dẫn luôn cho qua kể cả khi bảo trì.
-_MAINTENANCE_ALLOWLIST = ("/api/auth/login", "/docs", "/redoc", "/openapi.json", "/api/health")
+# Các đường dẫn luôn cho qua kể cả khi bảo trì (login + landing công khai read-only).
+_MAINTENANCE_ALLOWLIST = (
+    "/api/auth/login",
+    "/api/public",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/api/health",
+)
 
 
 class MaintenanceMiddleware(BaseHTTPMiddleware):
