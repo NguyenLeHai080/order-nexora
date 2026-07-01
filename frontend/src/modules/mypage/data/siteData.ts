@@ -86,11 +86,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Tin tức', href: '/danh-muc/tin-tuc' },
   {
     label: 'Chính sách',
-    href: '/#about',
+    href: '/danh-muc/chinh-sach',
     children: [
-      { label: 'Chính sách bảo hành', href: '/#about' },
-      { label: 'Chính sách hoàn tiền', href: '/#about' },
-      { label: 'Chính sách bảo mật', href: '/#about' },
+      { label: 'Tất cả chính sách', href: '/danh-muc/chinh-sach' },
+      { label: 'Chính sách bảo hành', href: '/danh-muc/chinh-sach' },
+      { label: 'Chính sách hoàn tiền', href: '/danh-muc/chinh-sach' },
+      { label: 'Chính sách bảo mật', href: '/danh-muc/chinh-sach' },
     ],
   },
   { label: 'FAQs', href: '/faq' },
@@ -111,9 +112,10 @@ export const FOOTER_LINKS = {
     { label: 'Về NexoraTech', href: '/#about' },
   ],
   support: [
-    { label: 'Chính sách bảo hành', href: '/#about' },
-    { label: 'Hướng dẫn nạp ví', href: '/#about' },
-    { label: 'Chính sách hoàn tiền', href: '/#about' },
+    { label: 'Chính sách bảo hành', href: '/danh-muc/chinh-sach' },
+    { label: 'Hướng dẫn nạp ví', href: '/danh-muc/chinh-sach' },
+    { label: 'Tra cứu đơn hàng', href: '/tra-cuu-don' },
+    { label: 'Chính sách hoàn tiền', href: '/danh-muc/chinh-sach' },
     { label: 'Hình thức thanh toán', href: '/#contact' },
   ],
 };

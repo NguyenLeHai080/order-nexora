@@ -24,6 +24,7 @@ export interface Product {
   quantity: number;
   low_stock_threshold?: number;
   warranty_days: number;
+  show_on_landing: boolean;
   supplier_id: number | null;
   supplier_name?: string | null;
   external_id?: string | null;

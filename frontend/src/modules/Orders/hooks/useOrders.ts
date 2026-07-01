@@ -6,7 +6,10 @@ import { ORDERS_ENDPOINT } from '../config/orderConfig';
 export interface Order {
   id: number;
   code: string;
-  user_id: number;
+  user_id: number | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  guest_email?: string | null;
   product_name: string;
   unit_price: string;
   quantity: number;
@@ -24,6 +27,9 @@ export interface Order {
   manual_qr_image_url?: string | null;
   profit: string;
   status: string;
+  payment_status?: string;
+  payment_reference?: string | null;
+  paid_at?: string | null;
   delivered_content: string | null;
   created_at: string | null;
 }
@@ -44,6 +50,13 @@ export function useOrders() {
 export const orderActions = {
   /** Hủy đơn (hoàn ví + hồi kho nếu là sản phẩm tự quản kho). */
   cancel: (id: number) => apiClient.post(`${ORDERS_ENDPOINT}/${id}/cancel`),
+  /** Xác nhận đơn (khách vãng lai) đã thanh toán → chuyển sang xử lý. */
+  markPaid: (id: number) => apiClient.post(`${ORDERS_ENDPOINT}/${id}/mark-paid`),
+  /** Duyệt đơn: thành công (kèm nội dung giao) hoặc thất bại. */
+  fulfill: (id: number, body: { result: 'success' | 'failed'; delivered_content?: string; note?: string }) =>
+    apiClient.post(`${ORDERS_ENDPOINT}/${id}/fulfill`, body),
+  /** Gọi nhà cung cấp lấy hàng cho đơn đang xử lý. */
+  retryProvider: (id: number) => apiClient.post(`${ORDERS_ENDPOINT}/${id}/retry-provider`),
 };
 
 /** Bảng xếp hạng khách hàng theo chi tiêu. */

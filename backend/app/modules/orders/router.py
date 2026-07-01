@@ -15,7 +15,7 @@ from app.modules.auth.dependencies import get_context, get_current_user, require
 from app.modules.inventory.models import StockMovement
 from app.modules.orders import service
 from app.modules.orders.models import Order
-from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderOut
+from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderFulfill, OrderOut
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/orders", tags=["Sales & Analytics"])
@@ -241,6 +241,52 @@ def cancel(
         raise ForbiddenError("Bạn không có quyền hủy đơn hàng này.")
     order = service.cancel_order(db, obj, actor_id=user.id)
     return success(_out(order), "Đã hủy đơn hàng và hoàn tiền vào ví.")
+
+
+@router.post("/{order_id}/mark-paid", summary="[Admin] Xác nhận đơn đã thanh toán (thủ công)")
+def mark_paid(
+    order_id: int,
+    _ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    if not obj.payment_reference:
+        raise ForbiddenError("Đơn này không dùng thanh toán trực tiếp.")
+    service.mark_order_paid(db, obj.payment_reference)
+    db.refresh(obj)
+    return success(_out(obj), "Đã xác nhận thanh toán, đơn chuyển sang xử lý.")
+
+
+@router.post("/{order_id}/fulfill", summary="[Admin] Duyệt đơn — thành công/thất bại")
+def fulfill(
+    order_id: int,
+    body: OrderFulfill,
+    ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.fulfill_order_admin(
+        db, obj, result=body.result, delivered_content=body.delivered_content,
+        note=body.note, actor_id=ctx.user_id,
+    )
+    return success(_out(order), "Đã cập nhật kết quả đơn hàng.")
+
+
+@router.post("/{order_id}/retry-provider", summary="[Admin] Lấy hàng từ nhà cung cấp")
+def retry_provider(
+    order_id: int,
+    _ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.retry_provider(db, obj)
+    return success(_out(order), "Đã gọi nhà cung cấp lấy hàng.")
 
 
 def _paginate_orders(db: Session, params: ListParams, organization_id: int | None):

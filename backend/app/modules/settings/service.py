@@ -18,10 +18,34 @@ MANUAL_FULFILLMENT_INSTRUCTIONS_KEY = "manual_fulfillment_instructions"
 # hình, public router fallback về org đầu tiên có sản phẩm active.
 PUBLIC_ORG_ID_KEY = "public_org_id"
 
+# Guest checkout (mua không cần đăng nhập) + thông báo.
+GUEST_CHECKOUT_ENABLED_KEY = "guest_checkout_enabled"
+# Đơn NCC giao TỰ ĐỘNG (AUTO): bật => tự gọi NCC ngay sau khi khách trả tiền;
+# tắt => chờ admin bấm duyệt.
+GUEST_AUTO_FULFILL_KEY = "guest_auto_fulfill"
+TELEGRAM_BOT_TOKEN_KEY = "telegram_bot_token"
+TELEGRAM_CHAT_ID_KEY = "telegram_chat_id"
+SMTP_HOST_KEY = "smtp_host"
+SMTP_PORT_KEY = "smtp_port"
+SMTP_USER_KEY = "smtp_user"
+SMTP_PASSWORD_KEY = "smtp_password"
+SMTP_FROM_KEY = "smtp_from"
+SMTP_USE_TLS_KEY = "smtp_use_tls"
+# URL gốc trang công khai — dùng dựng link tra cứu đơn gửi cho khách.
+SITE_BASE_URL_KEY = "site_base_url"
+
 
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
     setting = db.scalars(select(Setting).where(Setting.key == key)).first()
     return setting.value if setting else default
+
+
+def get_bool(db: Session, key: str, default: bool = False) -> bool:
+    """Đọc setting boolean — chấp nhận '1'/'true'/'on'/'yes' (không phân biệt hoa thường)."""
+    raw = get_value(db, key, None)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "on", "yes"}
 
 
 def set_value(db: Session, key: str, value: str, description: str | None = None) -> Setting:

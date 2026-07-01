@@ -3,6 +3,12 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import { formatCurrency, resolveAsset } from '../../../core/format';
 import MyPageShell, { useMyPage } from '../components/MyPageShell';
 import { usePublicProduct } from '../hooks/usePublicProducts';
+import { usePublicReviews, usePublicDiscussions } from '../hooks/usePublicEngagement';
+import { submitReview, submitDiscussion } from '../api/engagementClient';
+import EngagementList from '../components/engagement/EngagementList';
+import ReviewForm from '../components/engagement/ReviewForm';
+import CommentForm from '../components/engagement/CommentForm';
+import { StarRating } from '../components/engagement/StarRating';
 import { useCartStore } from '../store/cartStore';
 import type { PublicProduct } from '../api/publicClient';
 import { categoryVisual } from '../data/categoryVisual';
@@ -24,6 +30,8 @@ function deliveryLabel(type: string | null): string {
 function DetailContent({ product }: { product: PublicProduct }) {
   const addToCart = useCartStore((s) => s.add);
   const { openCart, isLoggedIn, openAuth } = useMyPage();
+  const reviews = usePublicReviews(product.id);
+  const discussions = usePublicDiscussions(product.id);
 
   const price = parseFloat(product.price);
   const regular = product.regular_price ? parseFloat(product.regular_price) : null;
@@ -32,6 +40,8 @@ function DetailContent({ product }: { product: PublicProduct }) {
   const img = resolveAsset(product.image_url);
   const outOfStock = product.stock_status === 'out_of_stock';
   const visual = categoryVisual(product.category_name, product.name);
+  const ratingAvg = reviews.summary.average || product.rating?.average || 0;
+  const ratingCount = reviews.summary.count || product.rating?.count || 0;
 
   const addItem = () => {
     addToCart({
@@ -107,6 +117,14 @@ function DetailContent({ product }: { product: PublicProduct }) {
             <h1 className="tw-mt-1 tw-text-[26px] tw-font-extrabold tw-leading-tight tw-text-neutral-900">{product.name}</h1>
             {product.name_en && <p className="tw-mt-1 tw-text-[14px] tw-text-neutral-500">{product.name_en}</p>}
 
+            {ratingCount > 0 && (
+              <a href="#reviews" className="tw-mt-2 tw-inline-flex tw-items-center tw-gap-2 tw-text-[13.5px] tw-text-neutral-500 hover:tw-text-gold-dark">
+                <StarRating value={ratingAvg} size={15} />
+                <span className="tw-font-semibold tw-text-ink">{ratingAvg.toFixed(1)}</span>
+                <span>({ratingCount} đánh giá)</span>
+              </a>
+            )}
+
             <div className="tw-mt-4 tw-flex tw-items-end tw-gap-3">
               <span className="tw-text-[30px] tw-font-extrabold tw-text-gold-dark">{formatCurrency(price)}</span>
               {hasDiscount && (
@@ -168,6 +186,57 @@ function DetailContent({ product }: { product: PublicProduct }) {
             </div>
           </div>
         )}
+
+        {/* Đánh giá sản phẩm */}
+        <div id="reviews" className="tw-mt-10 tw-scroll-mt-24">
+          <div className="tw-mb-5 tw-flex tw-flex-wrap tw-items-center tw-gap-3">
+            <h2 className="tw-text-[18px] tw-font-bold tw-text-neutral-900">Đánh giá sản phẩm</h2>
+            {ratingCount > 0 && (
+              <span className="tw-inline-flex tw-items-center tw-gap-2 tw-text-[14px] tw-text-neutral-500">
+                <StarRating value={ratingAvg} size={15} />
+                <span className="tw-font-semibold tw-text-ink">{ratingAvg.toFixed(1)}/5</span>
+                <span>· {ratingCount} lượt</span>
+              </span>
+            )}
+          </div>
+          <div className="tw-mb-6">
+            <ReviewForm
+              onSubmit={async (body) => {
+                const msg = await submitReview(product.id, body);
+                reviews.reload();
+                return msg;
+              }}
+            />
+          </div>
+          <EngagementList
+            items={reviews.items}
+            showRating
+            emptyText="Chưa có đánh giá nào cho sản phẩm này."
+          />
+        </div>
+
+        {/* Thảo luận / hỏi đáp */}
+        <div className="tw-mt-10 tw-border-t tw-border-neutral-200 tw-pt-8">
+          <h2 className="tw-mb-5 tw-flex tw-items-center tw-gap-2 tw-text-[18px] tw-font-bold tw-text-neutral-900">
+            <i className="bi bi-chat-dots tw-text-gold" />
+            Hỏi đáp &amp; thảo luận
+            {discussions.items.length > 0 && (
+              <span className="tw-text-[15px] tw-font-normal tw-text-neutral-400">({discussions.items.length})</span>
+            )}
+          </h2>
+          <div className="tw-mb-6">
+            <CommentForm
+              placeholder="Đặt câu hỏi hoặc trao đổi về sản phẩm này…"
+              submitLabel="Gửi câu hỏi"
+              onSubmit={async (body) => {
+                const msg = await submitDiscussion(product.id, body);
+                discussions.reload();
+                return msg;
+              }}
+            />
+          </div>
+          <EngagementList items={discussions.items} emptyText="Chưa có trao đổi nào. Hãy đặt câu hỏi đầu tiên!" />
+        </div>
       </div>
     </main>
   );

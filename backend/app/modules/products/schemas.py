@@ -22,6 +22,7 @@ class ProductCreate(BaseModel):
     low_stock_threshold: int = Field(0, ge=0)
     warranty_days: int = Field(0, ge=0)
     status: str = Field("active", pattern="^(active|inactive)$")
+    show_on_landing: bool = True
 
 
 class ProductUpdate(BaseModel):
@@ -41,6 +42,7 @@ class ProductUpdate(BaseModel):
     low_stock_threshold: int | None = Field(None, ge=0)
     stock_status: str | None = Field(None, pattern="^(in_stock|out_of_stock)$")
     status: str | None = Field(None, pattern="^(active|inactive)$")
+    show_on_landing: bool | None = None
 
 
 class ApplyMarkupRequest(BaseModel):
@@ -86,6 +88,7 @@ class ProductOut(BaseModel):
     quantity: int
     low_stock_threshold: int
     warranty_days: int
+    show_on_landing: bool = True
     organization_id: int | None
     created_at: datetime | None
     updated_at: datetime | None

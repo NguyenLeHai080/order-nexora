@@ -9,6 +9,7 @@ export interface Category {
   description: string | null;
   sort_order: number;
   status: string;
+  show_on_landing: boolean;
   product_count: number;
   organization_id?: number | null;
   created_at?: string | null;

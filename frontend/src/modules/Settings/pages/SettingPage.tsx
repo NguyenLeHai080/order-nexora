@@ -4,9 +4,10 @@ import { Loader } from '../../../ui';
 import { useSettings } from '../hooks/useSettings';
 import SettingRow from '../components/SettingRow';
 import AddSettingForm from '../components/AddSettingForm';
+import GuestCheckoutSettings from '../components/GuestCheckoutSettings';
 
 export default function SettingPage() {
-  const { settings, maintenance, loading, savingKey, toast, toggleMaintenance, saveSetting } = useSettings();
+  const { settings, maintenance, loading, savingKey, toast, notify, toggleMaintenance, saveSetting } = useSettings();
 
   if (loading) {
     return <div className="text-center py-5"><Loader /></div>;
@@ -45,6 +46,12 @@ export default function SettingPage() {
         </Col>
 
         <Col xl={7}>
+          <GuestCheckoutSettings
+            settings={settings}
+            savingKey={savingKey}
+            onSave={saveSetting}
+            onNotify={notify}
+          />
           <Card>
             <Card.Header>Danh sách cấu hình</Card.Header>
             <Card.Body>

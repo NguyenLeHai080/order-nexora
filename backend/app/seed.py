@@ -28,6 +28,9 @@ _SUBJECTS = [
     "invoices",
     "warranties",
     "returns",
+    "articles",
+    "faqs",
+    "engagements",
 ]
 _ACTIONS = ["index", "show", "store", "update", "destroy"]
 

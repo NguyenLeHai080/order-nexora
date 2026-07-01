@@ -46,6 +46,14 @@ const MENU: { section: string; items: MenuItem[] }[] = [
     ],
   },
   {
+    section: 'Nội dung',
+    items: [
+      { to: '/admin/articles', label: 'Bài viết', icon: 'bi-file-earmark-text', can: { action: 'index', subject: 'Article' } },
+      { to: '/admin/faqs', label: 'Câu hỏi thường gặp', icon: 'bi-question-circle', can: { action: 'index', subject: 'Faq' } },
+      { to: '/admin/engagements', label: 'Tương tác landing', icon: 'bi-chat-heart', can: { action: 'index', subject: 'Engagement' } },
+    ],
+  },
+  {
     section: 'Hệ thống',
     items: [
       { to: '/admin/users', label: 'Người dùng', icon: 'bi-people', can: { action: 'index', subject: 'User' } },

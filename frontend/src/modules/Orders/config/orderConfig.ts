@@ -3,6 +3,7 @@
 export const ORDERS_ENDPOINT = '/orders';
 
 export const ORDER_STATUS_OPTIONS = [
+  { value: 'awaiting_payment', label: 'Chờ thanh toán' },
   { value: 'processing', label: 'Đang xử lý' },
   { value: 'success', label: 'Thành công' },
   { value: 'failed', label: 'Thất bại' },

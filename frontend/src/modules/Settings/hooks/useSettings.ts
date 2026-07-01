@@ -74,5 +74,5 @@ export function useSettings() {
     [load, notify],
   );
 
-  return { settings, maintenance, loading, savingKey, toast, toggleMaintenance, saveSetting };
+  return { settings, maintenance, loading, savingKey, toast, notify, toggleMaintenance, saveSetting };
 }
