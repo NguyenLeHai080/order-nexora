@@ -135,11 +135,15 @@ export const FEATURE_INFO: Record<string, FeatureInfo> = {
   profit: {
     title: 'Lợi nhuận',
     intro:
-      'Tổng hợp lợi nhuận theo đơn: doanh thu, giá vốn (phải trả NCC) và lãi về ví chủ. Số liệu cộng dồn từ snapshot lưu tại thời điểm bán.',
+      'Hai góc nhìn tách biệt: (1) Lãi bán hàng theo đơn — doanh thu, giá vốn, lãi về ví chủ (cộng dồn snapshot lúc bán); (2) Dòng tiền kho hàng — tiền mặt thực thu/chi trong sổ kho, gồm cả tiền nhập hàng tồn chưa bán.',
     sections: [
       {
-        heading: 'Công thức',
-        body: 'Lãi chủ shop = tiền khách trả − giá vốn − giảm giá (voucher). Voucher làm lãi co lại, giá vốn trả NCC luôn giữ nguyên.',
+        heading: 'Lãi bán hàng (dồn tích)',
+        body: 'Lãi chủ shop = tiền khách trả − giá vốn − giảm giá (voucher). Voucher làm lãi co lại, giá vốn trả NCC luôn giữ nguyên. Chỉ tính đơn đã bán thành công.',
+      },
+      {
+        heading: 'Dòng tiền kho (tiền mặt)',
+        body: 'Dòng tiền ròng = tổng thu − tổng chi của sổ kho. Tiền nhập hàng (CHI khi nhập kho) bị trừ ngay dù hàng chưa bán, nên dòng tiền ròng có thể âm khi vừa nhập nhiều hàng — vốn đang đọng trong kho.',
       },
     ],
   },

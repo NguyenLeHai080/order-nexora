@@ -84,7 +84,11 @@ def update(
     if obj is None:
         raise NotFoundError("Không tìm thấy danh mục.")
     obj = repo.update(obj, **body.model_dump(exclude_unset=True))
-    return {"data": _out(obj, _product_counts(db, [obj])), "success": "true", "message": "Cập nhật danh mục thành công."}
+    return {
+        "data": _out(obj, _product_counts(db, [obj])),
+        "success": "true",
+        "message": "Cập nhật danh mục thành công.",
+    }
 
 
 @router.delete("/{category_id}", summary="Xóa danh mục")

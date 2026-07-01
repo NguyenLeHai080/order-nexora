@@ -7,6 +7,15 @@ class LoginRequest(BaseModel):
     password: str = Field(..., examples=["password"])
 
 
+class RegisterRequest(BaseModel):
+    """Khách tự đăng ký từ landing — luôn tạo tài khoản quyền thấp (role 'user')."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=6)
+    user_name: str | None = Field(None, max_length=150)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 

@@ -28,6 +28,32 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return data;
 }
 
+// Khách tự đăng ký (landing) — backend trả session đầy đủ nên auto-login luôn.
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+  userName?: string,
+): Promise<LoginResponse> {
+  const res = await apiClient.post('/auth/register', {
+    name,
+    email,
+    password,
+    user_name: userName || null,
+  });
+  const data: LoginResponse = res.data.data;
+  useAuthStore.getState().setSession({
+    token: data.access_token,
+    user: data.user,
+    organizationId: data.current_organization_id,
+    availableOrganizations: data.available_organizations,
+    roles: data.roles,
+    permissions: data.permissions,
+    abilities: data.abilities,
+  });
+  return data;
+}
+
 // Chuyển tổ chức làm việc và cập nhật lại quyền theo tổ chức mới.
 export async function switchOrganization(organizationId: number): Promise<void> {
   const res = await apiClient.post('/auth/switch-organization', { organization_id: organizationId });

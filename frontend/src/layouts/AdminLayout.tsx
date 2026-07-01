@@ -16,44 +16,44 @@ interface MenuItem {
 const MENU: { section: string; items: MenuItem[] }[] = [
   {
     section: 'Tổng quan',
-    items: [{ to: '/', label: 'Dashboard', icon: 'bi-speedometer2' }],
+    items: [{ to: '/admin', label: 'Dashboard', icon: 'bi-speedometer2' }],
   },
   {
     section: 'Quản lý kho hàng',
     items: [
-      { to: '/products', label: 'Sản phẩm & Kho', icon: 'bi-box-seam', can: { action: 'index', subject: 'Product' } },
-      { to: '/categories', label: 'Danh mục sản phẩm', icon: 'bi-tags', can: { action: 'index', subject: 'Categorie' } },
-      { to: '/inventory', label: 'Tồn kho (sổ kho)', icon: 'bi-clipboard-data', can: { action: 'index', subject: 'Inventory' } },
-      { to: '/suppliers', label: 'Nhà cung cấp kho', icon: 'bi-truck', can: { action: 'index', subject: 'Supplier' } },
-      { to: '/integrations', label: 'NCC & Tích hợp API', icon: 'bi-plugin', can: { action: 'index', subject: 'Partner' } },
-      { to: '/profit', label: 'Lợi nhuận', icon: 'bi-graph-up-arrow', can: { action: 'index', subject: 'Order' } },
+      { to: '/admin/products', label: 'Sản phẩm & Kho', icon: 'bi-box-seam', can: { action: 'index', subject: 'Product' } },
+      { to: '/admin/categories', label: 'Danh mục sản phẩm', icon: 'bi-tags', can: { action: 'index', subject: 'Categorie' } },
+      { to: '/admin/inventory', label: 'Tồn kho (sổ kho)', icon: 'bi-clipboard-data', can: { action: 'index', subject: 'Inventory' } },
+      { to: '/admin/suppliers', label: 'Nhà cung cấp kho', icon: 'bi-truck', can: { action: 'index', subject: 'Supplier' } },
+      { to: '/admin/integrations', label: 'NCC & Tích hợp API', icon: 'bi-plugin', can: { action: 'index', subject: 'Partner' } },
+      { to: '/admin/profit', label: 'Lợi nhuận', icon: 'bi-graph-up-arrow', can: { action: 'index', subject: 'Order' } },
     ],
   },
   {
     section: 'Bán hàng',
     items: [
-      { to: '/orders', label: 'Đơn hàng', icon: 'bi-bag-check', can: { action: 'index', subject: 'Order' } },
-      { to: '/invoices', label: 'Hóa đơn', icon: 'bi-receipt', can: { action: 'index', subject: 'Invoice' } },
-      { to: '/warranties', label: 'Bảo hành', icon: 'bi-shield-check', can: { action: 'index', subject: 'Warrantie' } },
-      { to: '/returns', label: 'Đổi/Trả hàng', icon: 'bi-arrow-left-right', can: { action: 'index', subject: 'Return' } },
-      { to: '/vouchers', label: 'Mã giảm giá', icon: 'bi-ticket-perforated', can: { action: 'index', subject: 'Voucher' } },
+      { to: '/admin/orders', label: 'Đơn hàng', icon: 'bi-bag-check', can: { action: 'index', subject: 'Order' } },
+      { to: '/admin/invoices', label: 'Hóa đơn', icon: 'bi-receipt', can: { action: 'index', subject: 'Invoice' } },
+      { to: '/admin/warranties', label: 'Bảo hành', icon: 'bi-shield-check', can: { action: 'index', subject: 'Warrantie' } },
+      { to: '/admin/returns', label: 'Đổi/Trả hàng', icon: 'bi-arrow-left-right', can: { action: 'index', subject: 'Return' } },
+      { to: '/admin/vouchers', label: 'Mã giảm giá', icon: 'bi-ticket-perforated', can: { action: 'index', subject: 'Voucher' } },
     ],
   },
   {
     section: 'Tài chính',
     items: [
-      { to: '/payments', label: 'Thanh toán & Nạp tiền', icon: 'bi-credit-card', can: { action: 'index', subject: 'Payment' } },
+      { to: '/admin/payments', label: 'Thanh toán & Nạp tiền', icon: 'bi-credit-card', can: { action: 'index', subject: 'Payment' } },
     ],
   },
   {
     section: 'Hệ thống',
     items: [
-      { to: '/users', label: 'Người dùng', icon: 'bi-people', can: { action: 'index', subject: 'User' } },
-      { to: '/roles', label: 'Vai trò & Phân quyền', icon: 'bi-shield-lock', can: { action: 'index', subject: 'Role' } },
-      { to: '/organizations', label: 'Tổ chức', icon: 'bi-diagram-3', can: { action: 'index', subject: 'Organization' } },
-      { to: '/log-activities', label: 'Nhật ký', icon: 'bi-clock-history', can: { action: 'index', subject: 'Log-activity' } },
-      { to: '/settings', label: 'Cài đặt', icon: 'bi-gear', can: { action: 'index', subject: 'Setting' } },
-      { to: '/ui-kit', label: 'UI Kit', icon: 'bi-palette' },
+      { to: '/admin/users', label: 'Người dùng', icon: 'bi-people', can: { action: 'index', subject: 'User' } },
+      { to: '/admin/roles', label: 'Vai trò & Phân quyền', icon: 'bi-shield-lock', can: { action: 'index', subject: 'Role' } },
+      { to: '/admin/organizations', label: 'Tổ chức', icon: 'bi-diagram-3', can: { action: 'index', subject: 'Organization' } },
+      { to: '/admin/log-activities', label: 'Nhật ký', icon: 'bi-clock-history', can: { action: 'index', subject: 'Log-activity' } },
+      { to: '/admin/settings', label: 'Cài đặt', icon: 'bi-gear', can: { action: 'index', subject: 'Setting' } },
+      { to: '/admin/ui-kit', label: 'UI Kit', icon: 'bi-palette' },
     ],
   },
 ];
@@ -65,7 +65,7 @@ export default function AdminLayout() {
 
   async function handleLogout() {
     await logout();
-    navigate('/login');
+    navigate('/');
   }
 
   return (
@@ -85,7 +85,7 @@ export default function AdminLayout() {
                   <NavLink
                     key={it.to}
                     to={it.to}
-                    end={it.to === '/'}
+                    end={it.to === '/admin'}
                     className={({ isActive }) => `app-menu-link ${isActive ? 'active' : ''}`}
                   >
                     <i className={`bi ${it.icon}`} />
@@ -120,7 +120,7 @@ export default function AdminLayout() {
               <Dropdown.Header>Đã đăng nhập với</Dropdown.Header>
               <Dropdown.ItemText className="fw-semibold">{user?.name}</Dropdown.ItemText>
               <Dropdown.Divider />
-              <Dropdown.Item as={Link} to="/settings">
+              <Dropdown.Item as={Link} to="/admin/settings">
                 <i className="bi bi-gear me-2" />
                 Cài đặt
               </Dropdown.Item>

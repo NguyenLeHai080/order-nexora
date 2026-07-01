@@ -1,7 +1,14 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import ProtectedRoute from './core/ProtectedRoute';
+import ProtectedRoute, { AdminGuard, CustomerRoute } from './core/ProtectedRoute';
 import AdminLayout from './layouts/AdminLayout';
-import LoginPage from './modules/Auth/pages/LoginPage';
+import HomePage from './modules/mypage/pages/HomePage';
+import ProductDetailPage from './modules/mypage/pages/ProductDetailPage';
+import ServicesPage from './modules/mypage/pages/ServicesPage';
+import TipsPage from './modules/mypage/pages/TipsPage';
+import NewsPage from './modules/mypage/pages/NewsPage';
+import ArticleDetailPage from './modules/mypage/pages/ArticleDetailPage';
+import FaqPage from './modules/mypage/pages/FaqPage';
+import AccountPage from './modules/mypage/pages/AccountPage';
 import DashboardPage from './modules/Dashboard/pages/DashboardPage';
 import UserListPage from './modules/Users/pages/UserListPage';
 import RoleListPage from './modules/Roles/pages/RoleListPage';
@@ -22,18 +29,40 @@ import InvoiceListPage from './modules/Invoices/pages/InvoiceListPage';
 import WarrantyListPage from './modules/Warranties/pages/WarrantyListPage';
 import ReturnListPage from './modules/Returns/pages/ReturnListPage';
 
-// Khai báo route. Mỗi trang nghiệp vụ được bảo vệ bằng permission tương ứng.
+/**
+ * Khai báo route.
+ * - `/` = landing (public). Không còn trang /login riêng — đăng nhập qua AuthModal.
+ * - `/tai-khoan` = khu tài khoản khách (chỉ cần đăng nhập).
+ * - `/admin/*` = backend quản trị, chỉ nhân viên (admin/ctv) qua AdminGuard;
+ *   mỗi trang nghiệp vụ vẫn kiểm permission riêng.
+ */
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        {/* Public / landing */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/san-pham/:slug" element={<ProductDetailPage />} />
+        <Route path="/dich-vu" element={<ServicesPage />} />
+        <Route path="/danh-muc/thu-thuat" element={<TipsPage />} />
+        <Route path="/danh-muc/tin-tuc" element={<NewsPage />} />
+        <Route path="/bai-viet/:slug" element={<ArticleDetailPage />} />
+        <Route path="/faq" element={<FaqPage />} />
+
+        {/* Khu tài khoản khách (landing theme) */}
+        <Route path="/tai-khoan" element={<CustomerRoute><AccountPage /></CustomerRoute>} />
+
+        {/* Alias tương thích đường dẫn cũ */}
+        <Route path="/landing" element={<Navigate to="/" replace />} />
+        <Route path="/landing/san-pham/:slug" element={<Navigate to="/" replace />} />
+
+        {/* Backend quản trị — chỉ admin/ctv */}
         <Route
-          path="/"
+          path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminGuard>
               <AdminLayout />
-            </ProtectedRoute>
+            </AdminGuard>
           }
         >
           <Route index element={<DashboardPage />} />
@@ -51,12 +80,13 @@ export default function App() {
           <Route path="profit" element={<ProtectedRoute permission="orders.index"><ProfitPage /></ProtectedRoute>} />
           <Route path="payments" element={<ProtectedRoute permission="payments.index"><PaymentPage /></ProtectedRoute>} />
           <Route path="vouchers" element={<ProtectedRoute permission="vouchers.index"><VoucherListPage /></ProtectedRoute>} />
-          <Route path="partner-webhooks" element={<Navigate to="/integrations" replace />} />
+          <Route path="partner-webhooks" element={<Navigate to="/admin/integrations" replace />} />
           <Route path="integrations" element={<ProtectedRoute permission="partner.index"><IntegrationsPage /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute permission="settings.index"><SettingPage /></ProtectedRoute>} />
           <Route path="log-activities" element={<ProtectedRoute permission="log-activities.index"><LogActivityPage /></ProtectedRoute>} />
           <Route path="ui-kit" element={<UiKitPage />} />
         </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
