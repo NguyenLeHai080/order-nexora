@@ -4,7 +4,6 @@ Mục tiêu: lợi nhuận không chỉ tính từ đơn bán, mà phản ánh c
 (stock-in) qua sổ kho. Hai góc nhìn tách biệt: lãi bán hàng (dồn tích) và dòng
 tiền kho (tiền mặt, gồm cả vốn đọng trong kho chưa bán).
 """
-from fastapi.testclient import TestClient
 
 
 def _auth(token: str, org_id: int) -> dict:

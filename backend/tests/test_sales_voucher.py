@@ -4,7 +4,6 @@
   và phải trả NCC (supplier_payable) giữ nguyên.
 - /orders/profit-by-product gộp doanh thu/giá vốn/lãi theo từng sản phẩm.
 """
-from fastapi.testclient import TestClient
 
 
 def _auth(token: str, org_id: int) -> dict:

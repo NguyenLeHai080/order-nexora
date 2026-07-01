@@ -2,6 +2,8 @@
 
 Chạy: python -m app.seed
 """
+from datetime import UTC
+
 from sqlalchemy import select
 
 from app.core.database import Base, SessionLocal, engine
@@ -403,14 +405,14 @@ def _seed_content(db, org_id: int) -> None:
     nội dung để giao diện không đổi. Idempotent: get-or-create theo (org, slug)
     với Article và (org, question) với Faq.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.modules.content.models import Article, Faq
 
     def _dmy(s: str) -> datetime:
         """'29/06/2026' -> datetime (UTC) để sắp xếp theo ngày đăng."""
         d, m, y = (int(x) for x in s.split("/"))
-        return datetime(y, m, d, tzinfo=timezone.utc)
+        return datetime(y, m, d, tzinfo=UTC)
 
     img = lambda seed: f"https://picsum.photos/seed/{seed}/420/260"  # noqa: E731
 

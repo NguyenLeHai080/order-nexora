@@ -18,5 +18,6 @@ select = ["E", "F", "I", "B", "UP", "ANN", "BLE"]
 ignore = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN206", "B008", "ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN"]
-"app/seed.py" = ["ANN"]
+# Test: cho phép assertion/setup dài; seed: chứa data literal (bài viết mock, hướng dẫn) dài là cố ý.
+"tests/*" = ["ANN", "E501"]
+"app/seed.py" = ["ANN", "E501"]

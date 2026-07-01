@@ -70,7 +70,8 @@ def get_manual_fulfillment_config(db: Session) -> dict[str, str | None]:
         "instructions": get_value(
             db,
             MANUAL_FULFILLMENT_INSTRUCTIONS_KEY,
-            "Don nay can nhan vien xu ly thu cong. Vui long quet Zalo hoac lien he nhan vien de duoc giao hang.",
+            "Don nay can nhan vien xu ly thu cong. Vui long quet Zalo hoac "
+            "lien he nhan vien de duoc giao hang.",
         ),
     }
 
