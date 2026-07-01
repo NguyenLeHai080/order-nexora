@@ -53,9 +53,18 @@ def create_deposit(
     db.commit()
     db.refresh(deposit)
 
+    # Với QR tự động: nếu client không chỉ định bank, tự chọn ngân hàng active
+    # đầu tiên. Cần thiết cho khách lẻ (role 'user') vì họ KHÔNG có quyền
+    # payments.index để tự liệt kê ngân hàng — checkout landing chỉ gửi amount.
     qr_url = None
-    if method == "qr_auto" and bank_account_id:
-        bank = db.get(BankAccount, bank_account_id)
+    bank: BankAccount | None = None
+    if method == "qr_auto":
+        if bank_account_id:
+            bank = db.get(BankAccount, bank_account_id)
+        if bank is None:
+            bank = db.scalars(
+                select(BankAccount).where(BankAccount.status == "active").order_by(BankAccount.id.asc())
+            ).first()
         if bank:
             qr_url = build_vietqr_url(bank, amount, reference)
 
@@ -65,6 +74,16 @@ def create_deposit(
         "amount": str(amount),
         "qr_url": qr_url,
         "status": deposit.status,
+        # Thông tin chuyển khoản thủ công (phòng khi user không quét QR được).
+        "bank": (
+            {
+                "bank_name": bank.bank_name,
+                "account_number": bank.account_number,
+                "account_holder": bank.account_holder,
+            }
+            if bank
+            else None
+        ),
     }
 
 

@@ -205,6 +205,7 @@ export default function IntegrationsPage() {
       <PageHeader
         title="Nhà cung cấp & Tích hợp"
         breadcrumb="Kinh doanh › Tích hợp API"
+        infoKey="integrations"
         actions={
           <Button variant="light" icon="arrow-clockwise"
             onClick={() => { void refetchSuppliers(); void refetchEvents(); }}>

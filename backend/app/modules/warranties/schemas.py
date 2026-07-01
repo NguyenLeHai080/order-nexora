@@ -19,5 +19,8 @@ class WarrantyOut(BaseModel):
     status: str
     claim_note: str | None
     created_at: datetime | None
+    # Số ngày còn lại tới hạn bảo hành (âm/0 nếu đã hết hạn) + nhãn hiển thị.
+    remaining_days: int = 0
+    remaining_label: str = ""
 
     model_config = {"from_attributes": True}

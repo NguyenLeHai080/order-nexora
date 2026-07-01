@@ -51,6 +51,7 @@ export default function VoucherListPage() {
       <PageHeader
         title="Mã giảm giá"
         breadcrumb="Kinh doanh › Voucher"
+        infoKey="vouchers"
         actions={
           can('create', 'Voucher') && (
             <Button variant="primary" icon="plus-lg" onClick={() => store.openCreate()}>

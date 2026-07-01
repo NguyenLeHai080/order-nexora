@@ -7,8 +7,11 @@ export interface Product {
   name: string;
   name_en?: string | null;
   category_name?: string | null;
+  category_id?: number | null;
+  image_url?: string | null;
   base_price: string;
   regular_price?: string | null;
+  list_price?: string | null;
   provider_discount_percent?: string | null;
   delivery_type?: string | null;
   provider_quantity?: number | null;
@@ -38,4 +41,7 @@ export const productActions = {
   remove: (id: number) => apiClient.delete(`${PRODUCTS_ENDPOINT}/${id}`),
   /** Đồng bộ catalog từ nhà cung cấp (driver vdstore) -> Product. */
   syncCatalog: (supplierId: number) => apiClient.post(`/partner/${supplierId}/sync-catalog`),
+  /** Áp markup hàng loạt cho sản phẩm chưa đặt giá (kích hoạt lãi). */
+  applyMarkup: (body: { markup_percent?: number; only_unpriced?: boolean }) =>
+    apiClient.post(`${PRODUCTS_ENDPOINT}/apply-markup`, body),
 };

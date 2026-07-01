@@ -67,3 +67,12 @@ export const useAuthStore = create<AuthState>()(
     { name: 'order-nexora-auth' },
   ),
 );
+
+/**
+ * Nhân viên nội bộ (được vào backend /admin) = có role admin hoặc ctv.
+ * Khách (role 'user' hoặc rỗng) KHÔNG được vào /admin — ở lại landing.
+ */
+export function isStaffRoles(roles: string[] | undefined | null): boolean {
+  if (!roles) return false;
+  return roles.includes('admin') || roles.includes('ctv');
+}

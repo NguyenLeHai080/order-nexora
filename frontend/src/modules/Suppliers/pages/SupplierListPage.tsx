@@ -45,6 +45,7 @@ export default function SupplierListPage() {
       <PageHeader
         title="Nhà cung cấp"
         breadcrumb="Kinh doanh › Nhà cung cấp"
+        infoKey="suppliers"
         actions={
           can('create', 'Supplier') && (
             <Button variant="primary" icon="plus-lg" onClick={() => store.openCreate()}>

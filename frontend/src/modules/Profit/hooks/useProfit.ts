@@ -12,6 +12,11 @@ export interface ProfitSummary {
   owner_wallet_balance?: string | null;
   margin_percent: number;
   order_count: number;
+  // Dòng tiền sổ kho (tiền mặt) — gồm cả tiền nhập hàng tồn chưa bán.
+  ledger_cash_in: string;
+  ledger_cash_out: string;
+  stock_in_cost: string;
+  net_cashflow: string;
 }
 
 export interface ProfitByProduct {

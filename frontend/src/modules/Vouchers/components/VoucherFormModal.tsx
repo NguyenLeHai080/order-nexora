@@ -13,8 +13,10 @@ interface Props {
 }
 
 // Modal voucher. Khi sửa, backend không cho đổi code nên ô code bị khóa.
+// Tạo mới: gõ Mô tả -> tự sinh gợi ý mã (vẫn cho sửa tay); để trống -> backend tự sinh.
 export default function VoucherFormModal({ show, editing, onClose, onSaved }: Props) {
   const [code, setCode] = useState('');
+  const [codeTouched, setCodeTouched] = useState(false);
   const [description, setDescription] = useState('');
   const [discountType, setDiscountType] = useState('amount');
   const [discountValue, setDiscountValue] = useState('0');
@@ -27,6 +29,7 @@ export default function VoucherFormModal({ show, editing, onClose, onSaved }: Pr
 
   function handleEnter() {
     setCode(editing?.code ?? '');
+    setCodeTouched(false);
     setDescription(editing?.description ?? '');
     setDiscountType(editing?.discount_type ?? 'amount');
     setDiscountValue(editing?.discount_value ?? '0');
@@ -35,6 +38,26 @@ export default function VoucherFormModal({ show, editing, onClose, onSaved }: Pr
     setEndsAt(editing?.ends_at ? editing.ends_at.slice(0, 16) : '');
     setStatus(editing?.status ?? 'active');
     setError(null);
+  }
+
+  // Sinh gợi ý mã từ mô tả: bỏ dấu/ký tự lạ, viết hoa, gộp khoảng trắng thành "-".
+  function slugifyCode(text: string): string {
+    return text
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, '-')
+      .slice(0, 12);
+  }
+
+  // Gõ mô tả -> cập nhật gợi ý mã nếu người dùng chưa tự sửa code (chỉ khi tạo mới).
+  function handleDescriptionChange(value: string) {
+    setDescription(value);
+    if (!editing && !codeTouched) {
+      setCode(slugifyCode(value));
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -54,7 +77,7 @@ export default function VoucherFormModal({ show, editing, onClose, onSaved }: Pr
       if (editing) {
         await voucherActions.update(editing.id, body);
       } else {
-        body.code = code;
+        body.code = code || null; // để trống -> backend tự sinh mã
         await voucherActions.create(body);
       }
       onSaved();
@@ -79,10 +102,13 @@ export default function VoucherFormModal({ show, editing, onClose, onSaved }: Pr
               <TextInput
                 id="vch-code"
                 label="Mã voucher"
-                required
                 disabled={!!editing}
                 value={code}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCode(e.target.value.toUpperCase())}
+                help={editing ? undefined : 'Bỏ trống = tự sinh từ mô tả'}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setCodeTouched(true);
+                  setCode(e.target.value.toUpperCase());
+                }}
               />
             </Col>
             <Col md={6}>
@@ -116,7 +142,7 @@ export default function VoucherFormModal({ show, editing, onClose, onSaved }: Pr
             </Col>
             <Col md={12}>
               <TextareaInput id="vch-desc" label="Mô tả" rows={1} value={description}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)} />
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleDescriptionChange(e.target.value)} />
             </Col>
             <Col md={12}>
               <SelectInput id="vch-status" label="Trạng thái" value={status}

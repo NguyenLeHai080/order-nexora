@@ -11,6 +11,7 @@ from app.modules.auth.dependencies import require
 from app.modules.vouchers.models import Voucher
 from app.modules.vouchers.repository import VoucherRepository
 from app.modules.vouchers.schemas import VoucherCreate, VoucherOut, VoucherUpdate
+from app.modules.vouchers.service import generate_unique_code
 
 router = APIRouter(prefix="/vouchers", tags=["Billing & Payment"])
 
@@ -47,7 +48,11 @@ def create(
     ctx: RequestContext = Depends(require("vouchers.store")),
     db: Session = Depends(get_db),
 ) -> dict:
-    obj = VoucherRepository(db).create(organization_id=ctx.organization_id, **body.model_dump())
+    data = body.model_dump()
+    # Mã bỏ trống -> tự sinh từ mô tả (hoặc ngẫu nhiên), đảm bảo duy nhất.
+    code = (data.get("code") or "").strip().upper()
+    data["code"] = code or generate_unique_code(db, body.description)
+    obj = VoucherRepository(db).create(organization_id=ctx.organization_id, **data)
     return {"data": _out(obj), "success": "true", "message": "Tạo voucher thành công!"}
 
 

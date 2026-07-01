@@ -8,7 +8,7 @@ export default function OrderListPage() {
   const [tab, setTab] = useState<'orders' | 'leaderboard'>('orders');
   return (
     <>
-      <PageHeader title="Đơn hàng" breadcrumb="Kinh doanh › Đơn hàng" />
+      <PageHeader title="Đơn hàng" breadcrumb="Kinh doanh › Đơn hàng" infoKey="orders" />
       <Nav variant="tabs" className="mb-3" activeKey={tab} onSelect={(k) => setTab(k as typeof tab)}>
         <Nav.Item>
           <Nav.Link eventKey="orders">

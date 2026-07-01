@@ -23,6 +23,15 @@ export default function WarrantyListPage() {
     { key: 'product_name', header: 'Sản phẩm' },
     { key: 'starts_at', header: 'Bắt đầu', render: (w) => formatDateTime(w.starts_at) },
     { key: 'ends_at', header: 'Kết thúc', render: (w) => formatDateTime(w.ends_at) },
+    {
+      key: 'remaining',
+      header: 'Còn lại',
+      render: (w) => {
+        const expired = w.status === 'expired' || (w.status === 'active' && w.remaining_days <= 0);
+        const cls = expired ? 'text-danger' : w.status === 'active' ? 'text-success' : 'text-muted';
+        return <span className={`fw-semibold ${cls}`}>{w.remaining_label}</span>;
+      },
+    },
     { key: 'status', header: 'Trạng thái', render: (w) => <StatusBadge status={w.status} /> },
     {
       key: 'actions',
@@ -43,7 +52,7 @@ export default function WarrantyListPage() {
 
   return (
     <>
-      <PageHeader title="Bảo hành" breadcrumb="Bán hàng › Bảo hành" />
+      <PageHeader title="Bảo hành" breadcrumb="Bán hàng › Bảo hành" infoKey="warranties" />
 
       <DataTable
         columns={columns}

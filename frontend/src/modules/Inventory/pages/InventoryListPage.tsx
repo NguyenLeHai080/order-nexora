@@ -172,6 +172,7 @@ export default function InventoryListPage() {
       <PageHeader
         title="Tồn kho"
         breadcrumb="Quản lý kho hàng › Tồn kho"
+        infoKey="inventory"
         actions={
           canManage && (
             <div className="d-flex gap-2">
