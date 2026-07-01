@@ -2,6 +2,8 @@
 
 Import module này (hoặc app.main) trước khi gọi Base.metadata.create_all.
 """
+from app.modules.categories.models import Category  # noqa: F401
+from app.modules.content.models import Article, Faq  # noqa: F401
 from app.modules.inventory.models import StockMovement  # noqa: F401
 from app.modules.invoices.models import Invoice  # noqa: F401
 from app.modules.log_activities.models import LogActivity  # noqa: F401

@@ -1,8 +1,9 @@
 """Router Orders — mua hàng, lịch sử, chi tiết, bảng xếp hạng, báo cáo lợi nhuận."""
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.context import RequestContext
@@ -11,9 +12,10 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.pagination import ListParams, list_params
 from app.core.response import paginated, success
 from app.modules.auth.dependencies import get_context, get_current_user, require
+from app.modules.inventory.models import StockMovement
 from app.modules.orders import service
 from app.modules.orders.models import Order
-from app.modules.orders.schemas import OrderCreate, OrderOut
+from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderOut
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/orders", tags=["Sales & Analytics"])
@@ -21,6 +23,11 @@ router = APIRouter(prefix="/orders", tags=["Sales & Analytics"])
 
 def _out(o: Order) -> dict:
     return OrderOut.model_validate(o).model_dump(mode="json")
+
+
+def _customer_out(o: Order) -> dict:
+    """Serialize đơn cho KHÁCH — ẩn giá vốn/lãi/nhà cung cấp/owner."""
+    return OrderCustomerOut.model_validate(o).model_dump(mode="json")
 
 
 @router.post("", status_code=201, summary="Mua sản phẩm")
@@ -40,7 +47,15 @@ def profit_summary(
     ctx: RequestContext = Depends(require("orders.index")),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Doanh thu / giá vốn / lợi nhuận / biên LN (chỉ tính đơn success)."""
+    """Tổng hợp lợi nhuận: gộp lãi bán hàng (đơn success) + dòng tiền sổ kho.
+
+    Hai góc nhìn, KHÔNG trộn lẫn:
+    - Lãi bán hàng (dồn tích): doanh thu − giá vốn của hàng ĐÃ bán (snapshot trên Order).
+      Đây là biên lợi nhuận thực của từng đơn, đã trừ voucher (owner_profit).
+    - Dòng tiền kho (tiền mặt): mọi THU − CHI trong sổ kho, gồm cả tiền NHẬP HÀNG
+      tồn chưa bán (`stock_in_cost`). Phản ánh tiền thực còn lại, kể cả vốn đang
+      "đọng" trong kho. `net_cashflow` âm khi vừa nhập nhiều hàng chưa kịp bán.
+    """
     stmt = select(
         func.coalesce(func.sum(Order.total_amount), 0),
         func.coalesce(func.sum(Order.total_cost), 0),
@@ -57,6 +72,25 @@ def profit_summary(
     owner_profit = owner_profit or 0
     profit = revenue - cost
     margin = float(profit) / float(revenue) * 100 if revenue else 0.0
+
+    # Dòng tiền sổ kho: gộp THU/CHI + tách riêng tiền nhập hàng (type="in").
+    mv_stmt = select(
+        func.coalesce(func.sum(StockMovement.cash_in), 0),
+        func.coalesce(func.sum(StockMovement.cash_out), 0),
+        func.coalesce(
+            func.sum(
+                case((StockMovement.type == "in", StockMovement.cash_out), else_=0)
+            ),
+            0,
+        ),
+    )
+    mv_stmt = _scope_movements(mv_stmt, ctx.organization_id, from_date, to_date)
+    ledger_cash_in, ledger_cash_out, stock_in_cost = db.execute(mv_stmt).one()
+    ledger_cash_in = ledger_cash_in or Decimal("0")
+    ledger_cash_out = ledger_cash_out or Decimal("0")
+    stock_in_cost = stock_in_cost or Decimal("0")
+    net_cashflow = ledger_cash_in - ledger_cash_out
+
     owner_user_id = service.resolve_owner_user_id(db, ctx.organization_id, ctx.user_id)
     owner = db.get(User, owner_user_id) if owner_user_id else None
     return success(
@@ -70,6 +104,11 @@ def profit_summary(
             "owner_wallet_balance": str(owner.balance) if owner is not None else None,
             "margin_percent": round(margin, 2),
             "order_count": count or 0,
+            # Dòng tiền kho (tiền mặt) — gồm cả nhập hàng tồn chưa bán.
+            "ledger_cash_in": str(ledger_cash_in),
+            "ledger_cash_out": str(ledger_cash_out),
+            "stock_in_cost": str(stock_in_cost),
+            "net_cashflow": str(net_cashflow),
         }
     )
 
@@ -165,7 +204,7 @@ def my_orders(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     stmt = stmt.order_by(Order.id.desc()).limit(params.limit).offset(params.offset)
     items = db.scalars(stmt).all()
-    return paginated([_out(i) for i in items], total, params.page, params.limit)
+    return paginated([_customer_out(i) for i in items], total, params.page, params.limit)
 
 
 @router.get("/{order_id}", summary="Chi tiết đơn hàng")
@@ -179,9 +218,12 @@ def show(
     if obj is None:
         raise NotFoundError("Không tìm thấy đơn hàng.")
     # Chủ đơn hoặc người có quyền orders.index mới được xem.
-    if obj.user_id != user.id and not ctx.has_permission("orders.index"):
+    is_staff = ctx.has_permission("orders.index")
+    if obj.user_id != user.id and not is_staff:
         raise ForbiddenError("Bạn không có quyền xem đơn hàng này.")
-    return {"data": _out(obj), "success": "true"}
+    # Khách (không có orders.index) chỉ nhận dữ liệu an toàn, không lộ giá vốn/lãi.
+    data = _out(obj) if is_staff else _customer_out(obj)
+    return {"data": data, "success": "true"}
 
 
 @router.post("/{order_id}/cancel", summary="Hủy đơn hàng")
@@ -220,4 +262,15 @@ def _scope_profit(stmt, organization_id: int | None, from_date: date | None, to_
         stmt = stmt.where(Order.created_at >= datetime.combine(from_date, time.min))
     if to_date:
         stmt = stmt.where(Order.created_at <= datetime.combine(to_date, time.max))
+    return stmt
+
+
+def _scope_movements(stmt, organization_id: int | None, from_date: date | None, to_date: date | None):
+    """Như `_scope_profit` nhưng cho truy vấn dòng tiền sổ kho (StockMovement)."""
+    if organization_id is not None:
+        stmt = stmt.where(StockMovement.organization_id == organization_id)
+    if from_date:
+        stmt = stmt.where(StockMovement.created_at >= datetime.combine(from_date, time.min))
+    if to_date:
+        stmt = stmt.where(StockMovement.created_at <= datetime.combine(to_date, time.max))
     return stmt

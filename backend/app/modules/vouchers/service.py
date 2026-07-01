@@ -1,4 +1,6 @@
 """Service Voucher — validate và áp dụng giảm giá lên tổng tiền."""
+import re
+import secrets
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -7,6 +9,37 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException
 from app.modules.vouchers.models import Voucher
+
+# Bộ ký tự sinh mã ngẫu nhiên (bỏ ký tự dễ nhầm: 0/O, 1/I).
+_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _slug_prefix(description: str | None) -> str:
+    """Lấy tiền tố mã từ mô tả: bỏ dấu/ký tự lạ, viết hoa, tối đa 12 ký tự.
+
+    Mô tả rỗng -> trả "VC" để vẫn có tiền tố nhận diện.
+    """
+    if not description:
+        return "VC"
+    # Chỉ giữ chữ/số ASCII; gộp khoảng trắng thành "-".
+    cleaned = re.sub(r"[^a-zA-Z0-9\s]", "", description).strip().upper()
+    cleaned = re.sub(r"\s+", "-", cleaned)
+    return cleaned[:12] or "VC"
+
+
+def generate_unique_code(db: Session, description: str | None = None) -> str:
+    """Sinh mã voucher duy nhất: <PREFIX>-<RANDOM4>, đảm bảo chưa tồn tại.
+
+    Thử tối đa vài lần với hậu tố ngẫu nhiên dài dần để tránh va chạm.
+    """
+    prefix = _slug_prefix(description)
+    for length in (4, 4, 5, 6, 8):
+        suffix = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(length))
+        code = f"{prefix}-{suffix}"
+        if db.scalars(select(Voucher).where(Voucher.code == code)).first() is None:
+            return code
+    # Cực hiếm khi tới đây — dùng token an toàn tuyệt đối.
+    return f"{prefix}-{secrets.token_hex(6).upper()}"
 
 
 def validate_voucher(db: Session, code: str) -> Voucher:

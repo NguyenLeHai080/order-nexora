@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations import registry
 from app.integrations.errors import ProviderError
+from app.modules.categories.models import Category
 from app.modules.orders.models import Order
 from app.modules.organizations.utils import slugify
 from app.modules.partner.models import ProviderOrderRef, ProviderWebhookEvent
@@ -235,12 +236,50 @@ class CatalogSyncResult:
     livemode: bool = False
 
 
+def _get_or_create_category(
+    db: Session,
+    cache: dict[str, Category],
+    name: str | None,
+    organization_id: int | None,
+) -> Category | None:
+    """Get-or-create Category theo (organization_id, name) từ tên danh mục NCC.
+
+    Dùng cache trong 1 lần sync để tránh truy vấn lặp. Chưa commit ở đây — caller
+    commit chung 1 lần ở cuối sync_catalog.
+    """
+    if not name:
+        return None
+    key = name.strip().lower()
+    if not key:
+        return None
+    if key in cache:
+        return cache[key]
+    stmt = select(Category).where(Category.name == name)
+    if organization_id is not None:
+        stmt = stmt.where(Category.organization_id == organization_id)
+    category = db.scalars(stmt).first()
+    if category is None:
+        category = Category(
+            name=name,
+            slug=slugify(name) or key,
+            organization_id=organization_id,
+            status="active",
+        )
+        db.add(category)
+        db.flush()  # cần id để gán product.category_id
+    cache[key] = category
+    return category
+
+
 def sync_catalog(db: Session, supplier: Supplier) -> CatalogSyncResult:
     """Đồng bộ catalog NCC -> bảng Product nội bộ.
 
     Map theo (supplier_id, external_id). Sản phẩm mới -> tạo (markup mặc định 0,
     admin tự chỉnh giá bán sau). Sản phẩm cũ -> chỉ cập nhật base_price/tồn kho/tên,
     KHÔNG đụng markup do ta tự đặt. Không tự xóa sản phẩm để tránh mất lịch sử.
+
+    Tên danh mục NCC được get-or-create thành Category nội bộ và gắn vào
+    Product.category_id (kèm giữ category_name để fallback/hiển thị).
     """
     client = registry.get_client(supplier)
     catalog = client.get_catalog()
@@ -254,9 +293,14 @@ def sync_catalog(db: Session, supplier: Supplier) -> CatalogSyncResult:
         vd_products.extend((p, cat.name) for p in cat.products)
 
     result = CatalogSyncResult(total=len(vd_products), livemode=catalog.livemode)
+    category_cache: dict[str, Category] = {}
 
     for vp, category_name in vd_products:
         fields = client.map_catalog_product(vp)
+        category = _get_or_create_category(
+            db, category_cache, category_name, supplier.organization_id
+        )
+        category_id = category.id if category is not None else None
         existing = db.scalars(
             select(Product).where(
                 Product.supplier_id == supplier.id,
@@ -271,6 +315,7 @@ def sync_catalog(db: Session, supplier: Supplier) -> CatalogSyncResult:
                 description=fields["description"],
                 name_en=fields.get("name_en"),
                 category_name=category_name,
+                category_id=category_id,
                 supplier_id=supplier.id,
                 external_id=fields["external_id"],
                 base_price=fields["base_price"],
@@ -291,6 +336,9 @@ def sync_catalog(db: Session, supplier: Supplier) -> CatalogSyncResult:
             existing.description = fields["description"]
             existing.name_en = fields.get("name_en")
             existing.category_name = category_name
+            # Chỉ gắn category_id khi NCC có danh mục — không xóa liên kết admin tự đặt.
+            if category_id is not None:
+                existing.category_id = category_id
             existing.base_price = fields["base_price"]
             existing.regular_price = fields.get("regular_price")
             existing.provider_discount_percent = fields.get("provider_discount_percent")

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Nav } from 'react-bootstrap';
 import { apiClient } from '../../../core/apiClient';
 import { useAuthStore } from '../../../core/authStore';
-import { formatCurrency, formatNumber } from '../../../core/format';
+import { formatCurrency, formatNumber, resolveAsset } from '../../../core/format';
 import PageHeader from '../../../components/PageHeader';
 import DataTable, { type Column } from '../../../components/DataTable';
 import ListToolbar from '../../../components/ListToolbar';
@@ -10,7 +10,7 @@ import Paginator from '../../../components/Paginator';
 import StatusBadge from '../../../components/StatusBadge';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { Button } from '../../../ui';
-import ProductFormModal, { type SupplierOpt } from '../components/ProductFormModal';
+import ProductFormModal, { type SupplierOpt, type CategoryOpt } from '../components/ProductFormModal';
 import PriceCalculatorModal from '../components/PriceCalculatorModal';
 import { useProducts, productActions, type Product } from '../hooks/useProducts';
 import { useProductStore } from '../store/productStore';
@@ -27,10 +27,12 @@ export default function ProductListPage() {
   const { data, meta, loading, query, setPage, setSearch, setStatus, patchQuery, refetch } = useProducts();
   const store = useProductStore();
   const [suppliers, setSuppliers] = useState<VdSupplier[]>([]);
+  const [categories, setCategories] = useState<CategoryOpt[]>([]);
   const [activeSupplier, setActiveSupplier] = useState<string>('all');
   const [calcProduct, setCalcProduct] = useState<Product | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [applyingMarkup, setApplyingMarkup] = useState(false);
 
   // Nạp danh sách nhà cung cấp để chọn trong form (nếu có quyền).
   useEffect(() => {
@@ -38,6 +40,15 @@ export default function ProductListPage() {
     apiClient
       .get('/suppliers', { params: { limit: 100 } })
       .then((r) => setSuppliers(r.data.data ?? []))
+      .catch(() => {});
+  }, [can]);
+
+  // Nạp danh mục để gán cho sản phẩm trong form (nếu có quyền).
+  useEffect(() => {
+    if (!can('index', 'Categorie')) return;
+    apiClient
+      .get('/categories', { params: { limit: 200 } })
+      .then((r) => setCategories(r.data.data ?? []))
       .catch(() => {});
   }, [can]);
 
@@ -71,18 +82,61 @@ export default function ProductListPage() {
     }
   }
 
+  // Áp giá bán hàng loạt: kích hoạt lãi cho sản phẩm chưa đặt giá (markup=0).
+  async function handleApplyMarkup() {
+    setApplyingMarkup(true);
+    setSyncMsg(null);
+    try {
+      const r = await productActions.applyMarkup({ only_unpriced: true });
+      const d = r.data.data;
+      setSyncMsg(`Đã áp markup ${d?.markup_percent ?? ''}% cho ${d?.updated ?? 0} sản phẩm chưa đặt giá.`);
+      refetch();
+    } catch {
+      setSyncMsg('Áp giá hàng loạt thất bại.');
+    } finally {
+      setApplyingMarkup(false);
+    }
+  }
+
   const columns: Column<Product>[] = [
     {
       key: 'name',
       header: 'Sản phẩm',
       render: (p) => (
-        <div>
-          <span className="fw-semibold">{p.name}</span>
-          {p.category_name && <small className="d-block text-muted">{p.category_name}</small>}
+        <div className="d-flex align-items-center gap-2">
+          {p.image_url ? (
+            <img
+              src={resolveAsset(p.image_url)}
+              alt={p.name}
+              className="border rounded"
+              style={{ width: 36, height: 36, objectFit: 'cover' }}
+            />
+          ) : (
+            <span
+              className="border rounded d-flex align-items-center justify-content-center text-muted bg-light"
+              style={{ width: 36, height: 36 }}
+            >
+              <i className="bi bi-box" />
+            </span>
+          )}
+          <div>
+            <span className="fw-semibold">{p.name}</span>
+            {p.category_name && <small className="d-block text-muted">{p.category_name}</small>}
+          </div>
         </div>
       ),
     },
     { key: 'base_price', header: 'Giá NCC (vốn)', render: (p) => formatCurrency(p.base_price) },
+    {
+      key: 'regular_price',
+      header: 'Giá niêm yết',
+      render: (p) =>
+        p.regular_price ? (
+          formatCurrency(p.regular_price)
+        ) : (
+          <span className="text-muted">— (theo vốn)</span>
+        ),
+    },
     {
       key: 'markup',
       header: 'Markup',
@@ -112,8 +166,8 @@ export default function ProductListPage() {
       key: 'profit',
       header: 'Lợi nhuận/đơn',
       render: (p) => {
-        const profit = computeUnitProfit(p.base_price, p.markup_percent, p.markup_amount);
-        const margin = computeMargin(p.base_price, p.markup_percent, p.markup_amount);
+        const profit = computeUnitProfit(p.base_price, p.regular_price, p.markup_percent, p.markup_amount);
+        const margin = computeMargin(p.base_price, p.regular_price, p.markup_percent, p.markup_amount);
         const atLoss = profit < 0;
         const breakEven = profit === 0;
         return (
@@ -175,11 +229,18 @@ export default function ProductListPage() {
       <PageHeader
         title="Sản phẩm"
         breadcrumb="Kinh doanh › Sản phẩm"
+        infoKey="products"
         actions={
           <div className="d-flex gap-2">
             {can('update', 'Product') && vdSuppliers.length > 0 && (
               <Button variant="light" icon="arrow-repeat" loading={syncing} onClick={handleSync}>
                 Đồng bộ NCC
+              </Button>
+            )}
+            {can('update', 'Product') && (
+              <Button variant="light" icon="cash-coin" loading={applyingMarkup} onClick={handleApplyMarkup}
+                title="Áp markup mặc định cho sản phẩm chưa đặt giá để sinh lãi">
+                Áp giá bán hàng loạt
               </Button>
             )}
             {can('create', 'Product') && (
@@ -226,6 +287,7 @@ export default function ProductListPage() {
         show={store.showForm}
         editing={store.editing}
         suppliers={suppliers}
+        categories={categories}
         onClose={store.closeForm}
         onSaved={refetch}
       />

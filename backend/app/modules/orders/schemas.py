@@ -41,6 +41,31 @@ class OrderOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrderCustomerOut(BaseModel):
+    """Đơn hàng — góc nhìn KHÁCH: KHÔNG lộ giá vốn/lãi/nhà cung cấp/owner.
+
+    Dùng cho GET /orders/me và chi tiết đơn của chính khách. Tuyệt đối không thêm
+    unit_cost/total_cost/supplier_*/owner_*/profit vào đây.
+    """
+
+    id: int
+    code: str
+    product_name: str
+    unit_price: Decimal
+    quantity: int
+    total_amount: Decimal
+    fulfillment_type: str | None = None
+    manual_fulfillment_required: bool = False
+    manual_contact_name: str | None = None
+    manual_contact_url: str | None = None
+    manual_qr_image_url: str | None = None
+    status: str
+    delivered_content: str | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
 class ProfitSummary(BaseModel):
     """Tổng hợp lợi nhuận trong một khoảng (chỉ tính đơn success)."""
 

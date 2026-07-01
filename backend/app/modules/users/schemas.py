@@ -24,6 +24,19 @@ class UserUpdate(BaseModel):
     role_ids: list[int] | None = None
 
 
+class UserSelfUpdate(BaseModel):
+    """Khách tự cập nhật hồ sơ — CHỈ các trường an toàn.
+
+    Cố tình KHÔNG có status/role_ids/balance/organization: khách không được tự
+    nâng quyền hay tự sửa số dư.
+    """
+
+    name: str | None = None
+    email: EmailStr | None = None
+    user_name: str | None = None
+    password: str | None = Field(None, min_length=6)
+
+
 class UserOut(BaseModel):
     id: int
     name: str

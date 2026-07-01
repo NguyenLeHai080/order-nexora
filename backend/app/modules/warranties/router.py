@@ -19,7 +19,32 @@ router = APIRouter(prefix="/warranties", tags=["Sales & Analytics"])
 
 
 def _out(w: Warranty) -> dict:
-    return WarrantyOut.model_validate(w).model_dump(mode="json")
+    data = WarrantyOut.model_validate(w).model_dump(mode="json")
+    data["remaining_days"], data["remaining_label"] = _remaining(w)
+    return data
+
+
+def _remaining(w: Warranty) -> tuple[int, str]:
+    """Tính số ngày còn lại tới hạn bảo hành + nhãn hiển thị.
+
+    - Phiếu void/claimed -> nhãn theo trạng thái, remaining 0.
+    - Còn hiệu lực: số ngày = ceil((ends_at - now)/ngày); >0 -> "Còn X ngày",
+      <=0 -> "Hết hạn".
+    """
+    if w.status == "void":
+        return 0, "Đã hủy"
+    if w.status == "claimed":
+        return 0, "Đã bảo hành"
+    if w.ends_at is None:
+        return 0, "Không thời hạn" if w.status == "active" else "Hết hạn"
+    ends_at = w.ends_at if w.ends_at.tzinfo is not None else w.ends_at.replace(tzinfo=UTC)
+    delta = ends_at - datetime.now(UTC)
+    if w.status == "expired" or delta.total_seconds() <= 0:
+        return 0, "Hết hạn"
+    # Làm tròn LÊN theo ngày: còn 1 phút vẫn tính là "còn 1 ngày".
+    days = delta.days + (1 if delta.seconds > 0 else 0)
+    days = max(days, 1)
+    return days, f"Còn {days} ngày"
 
 
 @router.get("", summary="Danh sách bảo hành")

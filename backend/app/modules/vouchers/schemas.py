@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field
 
 
 class VoucherCreate(BaseModel):
-    code: str
+    # Bỏ trống -> backend tự sinh mã từ mô tả (hoặc ngẫu nhiên VC-XXXXXX).
+    code: str | None = None
     description: str | None = None
     discount_type: str = Field("amount", pattern="^(amount|percent)$")
     discount_value: Decimal = Field(..., ge=0)

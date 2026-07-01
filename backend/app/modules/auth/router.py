@@ -5,21 +5,26 @@ POST /api/auth/login, /logout, /forgot-password, /reset-password,
 Các route /auth/* không cần header X-Organization-Id.
 """
 from fastapi import APIRouter, Depends, Header
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.abilities import permissions_to_abilities
 from app.core.database import get_db
+from app.core.exceptions import AppException
 from app.core.response import success
+from app.core.security import hash_password
 from app.modules.auth import service
 from app.modules.auth.access_control import resolve_roles_permissions
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
+    RegisterRequest,
     ResetPasswordRequest,
     SwitchOrganizationRequest,
 )
 from app.modules.users.models import User
+from app.modules.users.schemas import UserSelfUpdate
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -29,6 +34,13 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> dict:
     data = service.login(db, body.email, body.password)
     data["abilities"] = permissions_to_abilities(data["permissions"])
     return success(data, "Đăng nhập thành công.")
+
+
+@router.post("/register", status_code=201, summary="Khách tự đăng ký tài khoản")
+def register(body: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+    data = service.register(db, body.name, body.email, body.password, body.user_name)
+    data["abilities"] = permissions_to_abilities(data["permissions"])
+    return success(data, "Đăng ký thành công.")
 
 
 @router.post("/forgot-password", summary="Quên mật khẩu")
@@ -73,9 +85,62 @@ def current_user(
     roles, permissions = resolve_roles_permissions(db, user.id, x_organization_id)
     return success(
         {
-            "user": {"id": user.id, "name": user.name},
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "user_name": user.user_name,
+            },
+            "balance": user.balance,
             "roles": roles,
             "permissions": permissions,
             "abilities": permissions_to_abilities(permissions),
         }
+    )
+
+
+@user_router.patch("/user", summary="Tự cập nhật hồ sơ (tên/email/tên đăng nhập/mật khẩu)")
+def update_profile(
+    body: UserSelfUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Khách tự sửa hồ sơ. CHỈ đụng name/email/user_name/password — không bao giờ
+    role/balance/status (schema không có các trường đó)."""
+    data = body.model_dump(exclude_unset=True)
+
+    new_email = data.get("email")
+    if new_email:
+        new_email = new_email.strip().lower()
+        dup = db.scalars(
+            select(User).where(User.email == new_email, User.id != user.id)
+        ).first()
+        if dup:
+            raise AppException("Email đã được sử dụng.", 422)
+        user.email = new_email
+
+    new_user_name = data.get("user_name")
+    if new_user_name:
+        dup = db.scalars(
+            select(User).where(User.user_name == new_user_name, User.id != user.id)
+        ).first()
+        if dup:
+            raise AppException("Tên đăng nhập đã tồn tại.", 422)
+        user.user_name = new_user_name
+
+    if data.get("name"):
+        user.name = data["name"].strip()
+    if data.get("password"):
+        user.password = hash_password(data["password"])
+
+    db.commit()
+    db.refresh(user)
+    return success(
+        {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "user_name": user.user_name,
+        },
+        "Đã cập nhật hồ sơ.",
     )

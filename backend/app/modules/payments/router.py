@@ -117,6 +117,29 @@ def list_deposits(
     )
 
 
+@router.get("/deposits/me", summary="Lịch sử nạp tiền của tôi")
+def my_deposits(
+    params: ListParams = Depends(list_params),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Khách xem lịch sử nạp của chính mình (không cần quyền payments.index)."""
+    from sqlalchemy import func
+
+    stmt = select(Deposit).where(Deposit.user_id == user.id)
+    if params.status:
+        stmt = stmt.where(Deposit.status == params.status)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Deposit.id.desc()).limit(params.limit).offset(params.offset)
+    items = db.scalars(stmt).all()
+    return paginated(
+        [DepositOut.model_validate(d).model_dump(mode="json") for d in items],
+        total,
+        params.page,
+        params.limit,
+    )
+
+
 @router.post("/deposits/{deposit_id}/confirm", summary="Admin xác nhận nạp thủ công")
 def confirm_deposit(
     deposit_id: int,

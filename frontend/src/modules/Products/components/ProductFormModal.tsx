@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Col, Form, Modal, Row } from 'react-bootstrap';
 import { extractError } from '../../../core/useList';
 import { formatCurrency } from '../../../core/format';
-import { Button, TextInput, SelectInput } from '../../../ui';
+import { Button, TextInput, SelectInput, ImageUpload } from '../../../ui';
 import { productActions, type Product } from '../hooks/useProducts';
 import { DELIVERY_TYPE_OPTIONS, PRODUCT_STATUS_OPTIONS, STOCK_STATUS_OPTIONS } from '../config/productConfig';
 import { computeSalePrice, computeUnitProfit, computeMargin } from '../helpers/pricing';
@@ -12,21 +12,30 @@ export interface SupplierOpt {
   name: string;
 }
 
+export interface CategoryOpt {
+  id: number;
+  name: string;
+}
+
 interface Props {
   show: boolean;
   editing: Product | null;
   suppliers: SupplierOpt[];
+  categories: CategoryOpt[];
   onClose: () => void;
   onSaved: () => void;
 }
 
 // Modal tạo/sửa sản phẩm. Hiển thị giá bán tính realtime theo công thức pricing.
-export default function ProductFormModal({ show, editing, suppliers, onClose, onSaved }: Props) {
+export default function ProductFormModal({ show, editing, suppliers, categories, onClose, onSaved }: Props) {
   const [name, setName] = useState('');
   const [basePrice, setBasePrice] = useState('0');
+  const [regularPrice, setRegularPrice] = useState('');
   const [markupPercent, setMarkupPercent] = useState('0');
   const [markupAmount, setMarkupAmount] = useState('0');
   const [supplierId, setSupplierId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [deliveryType, setDeliveryType] = useState('');
   const [stockStatus, setStockStatus] = useState('in_stock');
   const [warrantyDays, setWarrantyDays] = useState('0');
@@ -38,9 +47,12 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
   function handleEnter() {
     setName(editing?.name ?? '');
     setBasePrice(editing?.base_price ?? '0');
+    setRegularPrice(editing?.regular_price ?? '');
     setMarkupPercent(editing?.markup_percent ?? '0');
     setMarkupAmount(editing?.markup_amount ?? '0');
     setSupplierId(editing?.supplier_id ? String(editing.supplier_id) : '');
+    setCategoryId(editing?.category_id ? String(editing.category_id) : '');
+    setImageUrl(editing?.image_url ?? '');
     setDeliveryType(editing?.delivery_type ?? '');
     setStockStatus(editing?.stock_status ?? 'in_stock');
     setWarrantyDays(editing?.warranty_days != null ? String(editing.warranty_days) : '0');
@@ -49,15 +61,20 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
     setError(null);
   }
 
-  const salePreview = computeSalePrice(basePrice, markupPercent, markupAmount);
-  const profitPreview = computeUnitProfit(basePrice, markupPercent, markupAmount);
-  const marginPreview = computeMargin(basePrice, markupPercent, markupAmount);
+  const salePreview = computeSalePrice(basePrice, regularPrice, markupPercent, markupAmount);
+  const profitPreview = computeUnitProfit(basePrice, regularPrice, markupPercent, markupAmount);
+  const marginPreview = computeMargin(basePrice, regularPrice, markupPercent, markupAmount);
   const atLoss = profitPreview < 0;
   const breakEven = profitPreview === 0 && parseFloat(basePrice || '0') > 0;
 
   const supplierOptions = [
     { value: '', label: '— Không —' },
     ...suppliers.map((s) => ({ value: String(s.id), label: s.name })),
+  ];
+
+  const categoryOptions = [
+    { value: '', label: '— Không —' },
+    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
   ];
 
   async function handleSubmit(e: React.FormEvent) {
@@ -68,9 +85,12 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
       const body: Record<string, unknown> = {
         name,
         base_price: parseFloat(basePrice || '0'),
+        regular_price: regularPrice !== '' ? parseFloat(regularPrice) : null,
         markup_percent: parseFloat(markupPercent || '0'),
         markup_amount: parseFloat(markupAmount || '0'),
         supplier_id: supplierId ? Number(supplierId) : null,
+        category_id: categoryId ? Number(categoryId) : null,
+        image_url: imageUrl || null,
         delivery_type: deliveryType || null,
         warranty_days: parseInt(warrantyDays || '0', 10),
         low_stock_threshold: parseInt(lowStockThreshold || '0', 10),
@@ -110,16 +130,27 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
                 options={supplierOptions} />
             </Col>
             <Col md={4}>
+              <SelectInput id="prod-category" label="Danh mục" value={categoryId}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryId(e.target.value)}
+                options={categoryOptions} />
+            </Col>
+            <Col md={4}>
               <SelectInput id="prod-delivery-type" label="Kiểu giao hàng" value={deliveryType}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDeliveryType(e.target.value)}
                 options={DELIVERY_TYPE_OPTIONS} />
             </Col>
             <Col md={4}>
-              <TextInput id="prod-base" label="Giá gốc (kho)" type="number" min="0" value={basePrice}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBasePrice(e.target.value)} />
+              <TextInput id="prod-base" label="Giá nhập NCC (vốn/CTV)" type="number" min="0" value={basePrice}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBasePrice(e.target.value)}
+                help="Giá phải trả lại NCC" />
             </Col>
             <Col md={4}>
-              <TextInput id="prod-percent" label="Markup %" type="number" min="0" step="0.1" value={markupPercent}
+              <TextInput id="prod-regular" label="Giá niêm yết (giá bán)" type="number" min="0" value={regularPrice}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegularPrice(e.target.value)}
+                help="Bỏ trống = lấy theo giá vốn" />
+            </Col>
+            <Col md={4}>
+              <TextInput id="prod-percent" label="Markup % (cộng thêm)" type="number" min="0" step="0.1" value={markupPercent}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMarkupPercent(e.target.value)} />
             </Col>
             <Col md={4}>
@@ -148,11 +179,20 @@ export default function ProductFormModal({ show, editing, suppliers, onClose, on
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatus(e.target.value)}
                 options={PRODUCT_STATUS_OPTIONS} />
             </Col>
+            <Col md={6}>
+              <ImageUpload label="Ảnh sản phẩm" value={imageUrl} onChange={setImageUrl}
+                help="Tải ảnh lên hoặc dán URL ngoài bên dưới" />
+            </Col>
+            <Col md={6}>
+              <TextInput id="prod-image-url" label="… hoặc dán link ảnh" value={imageUrl}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setImageUrl(e.target.value)}
+                placeholder="https://..." />
+            </Col>
           </Row>
           <div className={`alert mt-3 mb-0 d-flex justify-content-between align-items-center ${atLoss ? 'alert-danger' : breakEven ? 'alert-warning' : 'alert-info'}`}>
             <span>
               <i className="bi bi-calculator me-2" />
-              Giá bán = Giá gốc × (1 + %/100) + cố định
+              Giá bán = Giá niêm yết × (1 + %/100) + cố định
               {atLoss ? (
                 <small className="d-block mt-1 fw-semibold">
                   <i className="bi bi-exclamation-triangle-fill me-1" />

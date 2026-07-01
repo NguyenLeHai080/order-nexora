@@ -13,6 +13,8 @@ export interface Warranty {
   status: string;
   claim_note: string | null;
   created_at: string | null;
+  remaining_days: number;
+  remaining_label: string;
 }
 
 /** Danh sách + phân trang bảo hành. */
