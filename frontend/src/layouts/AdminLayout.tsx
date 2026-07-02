@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Dropdown } from 'react-bootstrap';
+import { Dropdown, Toast, ToastContainer } from 'react-bootstrap';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../core/authStore';
 import { logout } from '../modules/Auth/hooks/useAuth';
+import { useOrderNotifications } from '../modules/Orders/hooks/useOrderNotifications';
 
 interface MenuItem {
   to: string;
@@ -70,6 +71,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { user, roles, can } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
+  const { alerts, pendingCount, newOrder, dismissNew } = useOrderNotifications();
 
   async function handleLogout() {
     await logout();
@@ -111,38 +113,109 @@ export default function AdminLayout() {
           <button className="btn btn-light btn-sm" onClick={() => setCollapsed((c) => !c)}>
             <i className="bi bi-list fs-5" />
           </button>
-          <Dropdown align="end">
-            <Dropdown.Toggle variant="light" className="d-flex align-items-center gap-2 border-0">
-              <span
-                className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-                style={{ width: 34, height: 34 }}
-              >
-                {user?.name?.charAt(0).toUpperCase() ?? 'U'}
-              </span>
-              <span className="text-start d-none d-sm-block">
-                <div className="fw-semibold lh-1">{user?.name}</div>
-                <small className="text-muted">{roles.join(', ') || 'Người dùng'}</small>
-              </span>
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              <Dropdown.Header>Đã đăng nhập với</Dropdown.Header>
-              <Dropdown.ItemText className="fw-semibold">{user?.name}</Dropdown.ItemText>
-              <Dropdown.Divider />
-              <Dropdown.Item as={Link} to="/admin/settings">
-                <i className="bi bi-gear me-2" />
-                Cài đặt
-              </Dropdown.Item>
-              <Dropdown.Item onClick={handleLogout}>
-                <i className="bi bi-box-arrow-right me-2" />
-                Đăng xuất
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
+          <div className="d-flex align-items-center gap-2 ms-auto">
+            {can('index', 'Order') && (
+              <Dropdown align="end">
+                <Dropdown.Toggle
+                  variant="light"
+                  className="border-0 position-relative"
+                  id="order-alerts-bell"
+                  title="Đơn cần xử lý"
+                >
+                  <i className="bi bi-bell fs-5" />
+                  {pendingCount > 0 && (
+                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                      {pendingCount > 99 ? '99+' : pendingCount}
+                      <span className="visually-hidden">đơn cần xử lý</span>
+                    </span>
+                  )}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ minWidth: 320, maxHeight: 420, overflowY: 'auto' }}>
+                  <Dropdown.Header>
+                    Đơn cần xử lý {pendingCount > 0 && `(${pendingCount})`}
+                  </Dropdown.Header>
+                  {alerts.length === 0 ? (
+                    <Dropdown.ItemText className="text-muted small py-2">
+                      Không có đơn nào đang chờ xử lý.
+                    </Dropdown.ItemText>
+                  ) : (
+                    alerts.map((o) => (
+                      <Dropdown.Item key={o.id} as={Link} to="/admin/orders" className="text-wrap">
+                        <div className="d-flex justify-content-between align-items-start gap-2">
+                          <span className="fw-semibold">{o.code}</span>
+                          {o.is_guest && (
+                            <span className="badge bg-warning-subtle text-warning">Vãng lai</span>
+                          )}
+                        </div>
+                        <div className="small text-muted">
+                          {o.product_name} × {o.quantity}
+                          {o.is_guest && o.guest_name ? ` · ${o.guest_name}` : ''}
+                        </div>
+                      </Dropdown.Item>
+                    ))
+                  )}
+                  <Dropdown.Divider />
+                  <Dropdown.Item as={Link} to="/admin/orders" className="text-center small fw-semibold">
+                    Xem tất cả đơn hàng
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
+            <Dropdown align="end">
+              <Dropdown.Toggle variant="light" className="d-flex align-items-center gap-2 border-0">
+                <span
+                  className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                  style={{ width: 34, height: 34 }}
+                >
+                  {user?.name?.charAt(0).toUpperCase() ?? 'U'}
+                </span>
+                <span className="text-start d-none d-sm-block">
+                  <div className="fw-semibold lh-1">{user?.name}</div>
+                  <small className="text-muted">{roles.join(', ') || 'Người dùng'}</small>
+                </span>
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Header>Đã đăng nhập với</Dropdown.Header>
+                <Dropdown.ItemText className="fw-semibold">{user?.name}</Dropdown.ItemText>
+                <Dropdown.Divider />
+                <Dropdown.Item as={Link} to="/admin/settings">
+                  <i className="bi bi-gear me-2" />
+                  Cài đặt
+                </Dropdown.Item>
+                <Dropdown.Item onClick={handleLogout}>
+                  <i className="bi bi-box-arrow-right me-2" />
+                  Đăng xuất
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          </div>
         </header>
         <div className="app-content">
           <Outlet />
         </div>
       </div>
+
+      {/* Toast đơn mới — hiện khi poll phát hiện đơn mới, tự tắt sau 8s. */}
+      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 1090 }}>
+        <Toast show={!!newOrder} onClose={dismissNew} delay={8000} autohide bg="success">
+          <Toast.Header closeButton>
+            <i className="bi bi-bag-check-fill text-success me-2" />
+            <strong className="me-auto">Đơn hàng mới</strong>
+          </Toast.Header>
+          <Toast.Body className="text-white">
+            {newOrder && (
+              <Link to="/admin/orders" className="text-white text-decoration-none" onClick={dismissNew}>
+                <div className="fw-semibold">{newOrder.code}</div>
+                <div className="small">
+                  {newOrder.product_name} × {newOrder.quantity}
+                  {newOrder.is_guest && newOrder.guest_name ? ` · ${newOrder.guest_name}` : ''}
+                </div>
+                <div className="small text-decoration-underline">Bấm để xem →</div>
+              </Link>
+            )}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
     </div>
   );
 }

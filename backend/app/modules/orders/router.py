@@ -182,6 +182,59 @@ def leaderboard(
     return success(data)
 
 
+@router.get("/alerts", summary="Cảnh báo đơn cần xử lý (cho thông báo admin real-time)")
+def alerts(
+    ctx: RequestContext = Depends(require("orders.index")),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Tóm tắt đơn cần chú ý để admin poll định kỳ (thông báo không cần load trang).
+
+    Trả số đơn đang chờ xử lý (`processing`) + chờ thanh toán (`awaiting_payment`),
+    id đơn lớn nhất (để FE phát hiện đơn mới), và vài đơn mới nhất cần xử lý.
+    """
+    base = select(Order)
+    if ctx.organization_id is not None:
+        base = base.where(Order.organization_id == ctx.organization_id)
+
+    def _count(status: str) -> int:
+        stmt = base.where(Order.status == status)
+        return db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    processing_count = _count("processing")
+    awaiting_count = _count("awaiting_payment")
+
+    # Đơn mới nhất cần xử lý (đã thanh toán, chờ giao) — hiện trong dropdown chuông.
+    recent_stmt = base.where(Order.status == "processing").order_by(Order.id.desc()).limit(10)
+    recent = list(db.scalars(recent_stmt).all())
+
+    # id lớn nhất trong nhóm cần xử lý — FE so sánh để biết có đơn mới.
+    latest_id = recent[0].id if recent else 0
+
+    return success(
+        {
+            "processing_count": processing_count,
+            "awaiting_count": awaiting_count,
+            "latest_id": latest_id,
+            "recent": [
+                {
+                    "id": o.id,
+                    "code": o.code,
+                    "status": o.status,
+                    "product_name": o.product_name,
+                    "quantity": o.quantity,
+                    "total_amount": str(o.total_amount),
+                    "guest_name": o.guest_name,
+                    "guest_phone": o.guest_phone,
+                    "is_guest": o.user_id is None,
+                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+                }
+                for o in recent
+            ],
+        }
+    )
+
+
 @router.get("", summary="Lịch sử đơn hàng")
 def index(
     params: ListParams = Depends(list_params),
