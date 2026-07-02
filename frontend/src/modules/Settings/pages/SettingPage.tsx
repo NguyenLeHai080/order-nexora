@@ -1,12 +1,21 @@
-import { Alert, Card, Col, Form, Row } from 'react-bootstrap';
+import { useState } from 'react';
+import { Alert, Card, Col, Nav, Row } from 'react-bootstrap';
 import PageHeader from '../../../components/PageHeader';
 import { Loader } from '../../../ui';
 import { useSettings } from '../hooks/useSettings';
-import SettingRow from '../components/SettingRow';
-import AddSettingForm from '../components/AddSettingForm';
+import { SETTING_TABS } from '../config/settingConfig';
+import GeneralPanel from '../components/GeneralPanel';
+import SalesPanel from '../components/SalesPanel';
+import NotificationsPanel from '../components/NotificationsPanel';
+import AutomationPanel from '../components/AutomationPanel';
+import AdvancedPanel from '../components/AdvancedPanel';
 
+type TabKey = (typeof SETTING_TABS)[number]['key'];
+
+// Trang cài đặt: tab dọc theo nhóm (Chung / Guest & Bán hàng / Tự động hóa / Thông báo / Nâng cao).
 export default function SettingPage() {
-  const { settings, maintenance, loading, savingKey, toast, toggleMaintenance, saveSetting } = useSettings();
+  const { settings, maintenance, loading, savingKey, toast, notify, toggleMaintenance, saveSetting } = useSettings();
+  const [tab, setTab] = useState<TabKey>('general');
 
   if (loading) {
     return <div className="text-center py-5"><Loader /></div>;
@@ -19,44 +28,45 @@ export default function SettingPage() {
       {toast && <Alert variant={toast.type}>{toast.msg}</Alert>}
 
       <Row className="g-3">
-        <Col xl={5}>
-          <Card className="mb-3">
-            <Card.Header>Chế độ bảo trì</Card.Header>
-            <Card.Body>
-              <p className="text-muted">
-                Khi bật, mọi API mua bán bị chặn (trừ đăng nhập và tài liệu). Dùng khi cần nâng cấp hệ thống.
-              </p>
-              <div className="d-flex align-items-center justify-content-between p-3 rounded bg-light">
-                <span className="fw-semibold">
-                  <i className={`bi ${maintenance ? 'bi-cone-striped text-warning' : 'bi-check-circle text-success'} me-2`} />
-                  {maintenance ? 'Đang bảo trì' : 'Hệ thống hoạt động'}
-                </span>
-                <Form.Check
-                  type="switch"
-                  checked={maintenance}
-                  onChange={toggleMaintenance}
-                  style={{ transform: 'scale(1.4)' }}
-                />
-              </div>
+        <Col md={3}>
+          <Card>
+            <Card.Body className="p-2">
+              <Nav variant="pills" className="flex-column" activeKey={tab} onSelect={(k) => setTab(k as TabKey)}>
+                {SETTING_TABS.map((t) => (
+                  <Nav.Item key={t.key}>
+                    <Nav.Link eventKey={t.key}>
+                      <i className={`bi ${t.icon} me-2`} />
+                      {t.label}
+                    </Nav.Link>
+                  </Nav.Item>
+                ))}
+              </Nav>
             </Card.Body>
           </Card>
-
-          <AddSettingForm onAdd={(key, value) => saveSetting(key, value, null)} />
         </Col>
 
-        <Col xl={7}>
-          <Card>
-            <Card.Header>Danh sách cấu hình</Card.Header>
-            <Card.Body>
-              {settings.length === 0 ? (
-                <p className="text-muted mb-0">Chưa có cấu hình nào.</p>
-              ) : (
-                settings.map((s) => (
-                  <SettingRow key={s.key} setting={s} saving={savingKey === s.key} onSave={saveSetting} />
-                ))
-              )}
-            </Card.Body>
-          </Card>
+        <Col md={9}>
+          {tab === 'general' && (
+            <GeneralPanel
+              settings={settings}
+              savingKey={savingKey}
+              onSave={saveSetting}
+              maintenance={maintenance}
+              onToggleMaintenance={toggleMaintenance}
+            />
+          )}
+          {tab === 'sales' && (
+            <SalesPanel settings={settings} savingKey={savingKey} onSave={saveSetting} />
+          )}
+          {tab === 'automation' && (
+            <AutomationPanel settings={settings} savingKey={savingKey} onSave={saveSetting} />
+          )}
+          {tab === 'notifications' && (
+            <NotificationsPanel settings={settings} savingKey={savingKey} onSave={saveSetting} onNotify={notify} />
+          )}
+          {tab === 'advanced' && (
+            <AdvancedPanel settings={settings} savingKey={savingKey} onSave={saveSetting} />
+          )}
         </Col>
       </Row>
     </>

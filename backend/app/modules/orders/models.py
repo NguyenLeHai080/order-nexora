@@ -6,9 +6,10 @@ delivered_content giữ "hàng" trả về từ nhà cung cấp (link/key/tài l
 """
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -19,7 +20,14 @@ class Order(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     __tablename__ = "orders"
 
     code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Nullable: đơn của khách vãng lai (guest checkout) không có user_id.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Thông tin liên hệ khách vãng lai (khi user_id is None).
+    guest_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    guest_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    guest_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     product_id: Mapped[int | None] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -48,9 +56,20 @@ class Order(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     manual_qr_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default="processing", index=True)
-    # processing | success | failed
+    # awaiting_payment | processing | success | failed | cancelled
     delivered_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Thanh toán trực tiếp theo đơn (guest checkout — không qua ví).
+    payment_status: Mapped[str] = mapped_column(String(20), default="unpaid", index=True)
+    # unpaid | paid — đơn ví logged-in tạo ra set luôn 'paid'.
+    payment_reference: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    lookup_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def is_guest(self) -> bool:
+        return self.user_id is None
 
     @property
     def profit(self) -> Decimal:

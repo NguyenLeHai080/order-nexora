@@ -88,24 +88,51 @@ def create_deposit(
 
 
 def process_webhook(db: Session, reference_code: str, amount: Decimal, signature: str) -> dict:
-    """Xử lý báo có (callback) từ ngân hàng. Cộng tiền nếu hợp lệ và chưa xử lý."""
+    """Xử lý báo có (callback) từ ngân hàng. Cộng ví (nạp tiền) HOẶC đánh dấu đơn
+    khách vãng lai đã thanh toán, tùy reference khớp Deposit hay Order.
+
+    Xác thực HMAC-SHA256 trên (reference_code + amount) với jwt_secret cho cả 2 luồng.
+    """
     expected = _sign(reference_code, amount)
     if not hmac.compare_digest(expected, signature):
         raise AppException("Chữ ký webhook không hợp lệ.", 401)
 
     deposit = db.scalars(select(Deposit).where(Deposit.reference_code == reference_code)).first()
-    if deposit is None:
-        raise NotFoundError("Không tìm thấy giao dịch nạp.")
-    if deposit.status == "success":
-        return {"reference_code": reference_code, "status": "already_processed"}
-    if deposit.amount != amount:
-        raise AppException("Số tiền không khớp giao dịch.")
+    if deposit is not None:
+        if deposit.status == "success":
+            return {"reference_code": reference_code, "status": "already_processed"}
+        if deposit.amount != amount:
+            raise AppException("Số tiền không khớp giao dịch.")
 
-    # Cộng tiền vào ví user (idempotent nhờ check status).
-    user = db.get(User, deposit.user_id)
-    if user is None:
-        raise NotFoundError("Người dùng không tồn tại.")
-    user.balance = (user.balance or Decimal("0")) + amount
-    deposit.status = "success"
-    db.commit()
-    return {"reference_code": reference_code, "status": "success"}
+        # Cộng tiền vào ví user (idempotent nhờ check status).
+        user = db.get(User, deposit.user_id)
+        if user is None:
+            raise NotFoundError("Người dùng không tồn tại.")
+        from app.modules.finance import service as finance_service
+
+        finance_service.post_wallet_txn(
+            db, user, type="deposit", direction="in", amount=amount,
+            organization_id=deposit.organization_id, ref_type="deposit", ref_id=deposit.id,
+            note="Nạp tiền (webhook)",
+        )
+        deposit.status = "success"
+        db.commit()
+        return {"reference_code": reference_code, "status": "success"}
+
+    # Không phải giao dịch nạp — thử khớp đơn khách vãng lai (payment_reference).
+    from app.modules.orders.models import Order
+    from app.modules.orders import service as order_service
+
+    orders = list(db.scalars(select(Order).where(Order.payment_reference == reference_code)).all())
+    if not orders:
+        raise NotFoundError("Không tìm thấy giao dịch nạp.")
+
+    if all(o.payment_status == "paid" for o in orders):
+        return {"reference_code": reference_code, "status": "already_processed"}
+
+    expected_total = sum((o.total_amount or Decimal("0")) for o in orders)
+    if expected_total != amount:
+        raise AppException("Số tiền không khớp đơn hàng.")
+
+    order_service.mark_order_paid(db, reference_code)
+    return {"reference_code": reference_code, "status": "success", "kind": "guest_order"}

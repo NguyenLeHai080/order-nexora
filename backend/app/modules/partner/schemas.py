@@ -76,3 +76,57 @@ class ProviderWebhookEventOut(BaseModel):
     created_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class CatalogSyncRequest(BaseModel):
+    dry_run: bool = False
+    discontinue_missing: bool = True
+
+
+class CatalogSyncRunOut(BaseModel):
+    id: int
+    supplier_id: int | None
+    driver: str
+    supplier_name: str | None
+    mode: str
+    status: str
+    livemode: bool
+    total: int
+    created_count: int
+    updated_count: int
+    discontinued_count: int
+    reactivated_count: int
+    unchanged_count: int
+    warning_count: int
+    error_count: int
+    requested_by: int | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    error_message: str | None
+    organization_id: int | None
+    created_at: datetime | None
+    updated_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class CatalogSyncItemOut(BaseModel):
+    id: int
+    run_id: int
+    supplier_id: int | None
+    product_id: int | None
+    external_id: str | None
+    product_name: str | None
+    action: str
+    warning_code: str | None
+    note: str | None
+    old_base_price: Decimal | None
+    new_base_price: Decimal | None
+    old_sale_price: Decimal | None
+    new_sale_price: Decimal | None
+    margin_after: Decimal | None
+    stock_status: str | None
+    payload: dict | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}

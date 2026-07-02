@@ -13,8 +13,8 @@ export interface Article {
   category: string;
   /** key danh mục để lọc tab. */
   categoryKey: string;
-  /** Nhóm trang: tips | news (để breadcrumb + bài liên quan). */
-  group: 'tips' | 'news';
+  /** Nhóm trang: tips | news | policy (để breadcrumb + bài liên quan). */
+  group: 'tips' | 'news' | 'policy';
   date: string;
   author?: string;
   excerpt: string;

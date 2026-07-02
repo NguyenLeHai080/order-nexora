@@ -2,6 +2,7 @@
 
 Trang API docs tự sinh tại /docs (Swagger) và /redoc.
 """
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,7 +29,20 @@ async def lifespan(_app: FastAPI):
         from app.core.dev_migrate import ensure_dev_schema
 
         ensure_dev_schema(engine)
-    yield
+
+    from app.modules.partner.sync_scheduler import run_catalog_sync_scheduler
+
+    stop_event = asyncio.Event()
+    scheduler_task = asyncio.create_task(run_catalog_sync_scheduler(stop_event))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:

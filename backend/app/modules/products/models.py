@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -68,6 +68,10 @@ class Product(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     low_stock_threshold: Mapped[int] = mapped_column(Integer, default=0)
     # Số ngày bảo hành mặc định khi bán (0 = không tạo phiếu bảo hành).
     warranty_days: Mapped[int] = mapped_column(Integer, default=0)
+    # Cho phép admin ẩn/hiện sản phẩm trên landing (độc lập với status nghiệp vụ).
+    show_on_landing: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), index=True
+    )
 
     @property
     def list_price(self) -> Decimal:

@@ -2,7 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class OrderCreate(BaseModel):
@@ -13,10 +13,47 @@ class OrderCreate(BaseModel):
     voucher_code: str | None = None
 
 
+class GuestOrderItem(BaseModel):
+    product_id: int
+    quantity: int = Field(1, ge=1)
+
+
+class GuestOrderCreate(BaseModel):
+    """Khách vãng lai (chưa đăng nhập) đặt đơn — trả QR để chuyển khoản trực tiếp."""
+
+    items: list[GuestOrderItem] = Field(..., min_length=1)
+    name: str = Field(..., min_length=1, max_length=120)
+    phone: str | None = Field(None, max_length=30)
+    email: str | None = Field(None, max_length=255)
+
+    @model_validator(mode="after")
+    def _require_contact(self) -> "GuestOrderCreate":
+        if not (self.phone and self.phone.strip()) and not (self.email and self.email.strip()):
+            raise ValueError("Vui lòng nhập số điện thoại hoặc email để nhận thông báo đơn hàng.")
+        return self
+
+
+class OrderFulfill(BaseModel):
+    """Admin duyệt đơn: thành công (kèm nội dung giao) hoặc thất bại."""
+
+    result: str = Field(..., pattern="^(success|failed)$")
+    delivered_content: str | None = None
+    note: str | None = None
+
+
+class OrderRefund(BaseModel):
+    """Admin đánh dấu đã hoàn tiền tay cho đơn guest thất bại."""
+
+    note: str | None = None
+
+
 class OrderOut(BaseModel):
     id: int
     code: str
-    user_id: int
+    user_id: int | None = None
+    guest_name: str | None = None
+    guest_phone: str | None = None
+    guest_email: str | None = None
     product_id: int | None
     product_name: str
     unit_price: Decimal
@@ -35,6 +72,37 @@ class OrderOut(BaseModel):
     manual_qr_image_url: str | None = None
     profit: Decimal
     status: str
+    payment_status: str = "unpaid"
+    payment_reference: str | None = None
+    paid_at: datetime | None = None
+    delivered_content: str | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class OrderCustomerOut(BaseModel):
+    """Đơn hàng — góc nhìn KHÁCH: KHÔNG lộ giá vốn/lãi/nhà cung cấp/owner.
+
+    Dùng cho GET /orders/me, tra cứu đơn guest và chi tiết đơn của chính khách.
+    Tuyệt đối không thêm unit_cost/total_cost/supplier_*/owner_*/profit/
+    payment_reference/lookup_token vào đây.
+    """
+
+    id: int
+    code: str
+    product_name: str
+    unit_price: Decimal
+    quantity: int
+    total_amount: Decimal
+    fulfillment_type: str | None = None
+    manual_fulfillment_required: bool = False
+    manual_contact_name: str | None = None
+    manual_contact_url: str | None = None
+    manual_qr_image_url: str | None = None
+    status: str
+    payment_status: str = "unpaid"
+    paid_at: datetime | None = None
     delivered_content: str | None
     created_at: datetime | None
 

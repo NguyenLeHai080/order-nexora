@@ -35,13 +35,15 @@ export const articleHeroFromSlug = (slug: string) =>
 
 /** PublicArticle (API) -> Article (shape FE component đang dùng). */
 function toArticle(a: PublicArticle): Article {
+  const group: Article['group'] =
+    a.group === 'news' ? 'news' : a.group === 'policy' ? 'policy' : 'tips';
   return {
     id: a.id,
     slug: a.slug,
     title: a.title,
     category: a.category,
     categoryKey: a.category_key,
-    group: (a.group === 'news' ? 'news' : 'tips'),
+    group,
     date: dmy(a.published_at),
     author: a.author ?? undefined,
     excerpt: a.excerpt ?? '',
@@ -66,8 +68,8 @@ function buildTabs(articles: Article[]): ArticleTab[] {
 
 /* ─── Hooks ───────────────────────────────────────────────────────────── */
 
-/** Danh sách bài viết theo nhóm (tips|news) + tab lọc dựng từ dữ liệu thật. */
-export function usePublicArticles(group: 'tips' | 'news') {
+/** Danh sách bài viết theo nhóm (tips|news|policy) + tab lọc dựng từ dữ liệu thật. */
+export function usePublicArticles(group: 'tips' | 'news' | 'policy') {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
 

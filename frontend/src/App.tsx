@@ -6,8 +6,10 @@ import ProductDetailPage from './modules/mypage/pages/ProductDetailPage';
 import ServicesPage from './modules/mypage/pages/ServicesPage';
 import TipsPage from './modules/mypage/pages/TipsPage';
 import NewsPage from './modules/mypage/pages/NewsPage';
+import PolicyPage from './modules/mypage/pages/PolicyPage';
 import ArticleDetailPage from './modules/mypage/pages/ArticleDetailPage';
 import FaqPage from './modules/mypage/pages/FaqPage';
+import OrderLookupPage from './modules/mypage/pages/OrderLookupPage';
 import AccountPage from './modules/mypage/pages/AccountPage';
 import DashboardPage from './modules/Dashboard/pages/DashboardPage';
 import UserListPage from './modules/Users/pages/UserListPage';
@@ -19,6 +21,7 @@ import SupplierListPage from './modules/Suppliers/pages/SupplierListPage';
 import OrderListPage from './modules/Orders/pages/OrderListPage';
 import ProfitPage from './modules/Profit/pages/ProfitPage';
 import PaymentPage from './modules/Payments/pages/PaymentPage';
+import FinancePage from './modules/Finance/pages/FinancePage';
 import VoucherListPage from './modules/Vouchers/pages/VoucherListPage';
 import SettingPage from './modules/Settings/pages/SettingPage';
 import LogActivityPage from './modules/LogActivities/pages/LogActivityPage';
@@ -28,6 +31,9 @@ import InventoryListPage from './modules/Inventory/pages/InventoryListPage';
 import InvoiceListPage from './modules/Invoices/pages/InvoiceListPage';
 import WarrantyListPage from './modules/Warranties/pages/WarrantyListPage';
 import ReturnListPage from './modules/Returns/pages/ReturnListPage';
+import ArticleListPage from './modules/Content/pages/ArticleListPage';
+import FaqListPage from './modules/Content/pages/FaqListPage';
+import EngagementListPage from './modules/Engagement/pages/EngagementListPage';
 
 /**
  * Khai báo route.
@@ -46,8 +52,10 @@ export default function App() {
         <Route path="/dich-vu" element={<ServicesPage />} />
         <Route path="/danh-muc/thu-thuat" element={<TipsPage />} />
         <Route path="/danh-muc/tin-tuc" element={<NewsPage />} />
+        <Route path="/danh-muc/chinh-sach" element={<PolicyPage />} />
         <Route path="/bai-viet/:slug" element={<ArticleDetailPage />} />
         <Route path="/faq" element={<FaqPage />} />
+        <Route path="/tra-cuu-don" element={<OrderLookupPage />} />
 
         {/* Khu tài khoản khách (landing theme) */}
         <Route path="/tai-khoan" element={<CustomerRoute><AccountPage /></CustomerRoute>} />
@@ -79,11 +87,15 @@ export default function App() {
           <Route path="returns" element={<ProtectedRoute permission="returns.index"><ReturnListPage /></ProtectedRoute>} />
           <Route path="profit" element={<ProtectedRoute permission="orders.index"><ProfitPage /></ProtectedRoute>} />
           <Route path="payments" element={<ProtectedRoute permission="payments.index"><PaymentPage /></ProtectedRoute>} />
+          <Route path="finance" element={<ProtectedRoute permission="finance.index"><FinancePage /></ProtectedRoute>} />
           <Route path="vouchers" element={<ProtectedRoute permission="vouchers.index"><VoucherListPage /></ProtectedRoute>} />
           <Route path="partner-webhooks" element={<Navigate to="/admin/integrations" replace />} />
           <Route path="integrations" element={<ProtectedRoute permission="partner.index"><IntegrationsPage /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute permission="settings.index"><SettingPage /></ProtectedRoute>} />
           <Route path="log-activities" element={<ProtectedRoute permission="log-activities.index"><LogActivityPage /></ProtectedRoute>} />
+          <Route path="articles" element={<ProtectedRoute permission="articles.index"><ArticleListPage /></ProtectedRoute>} />
+          <Route path="faqs" element={<ProtectedRoute permission="faqs.index"><FaqListPage /></ProtectedRoute>} />
+          <Route path="engagements" element={<ProtectedRoute permission="engagements.index"><EngagementListPage /></ProtectedRoute>} />
           <Route path="ui-kit" element={<UiKitPage />} />
         </Route>
 

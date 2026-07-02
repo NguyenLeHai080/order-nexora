@@ -18,10 +18,52 @@ MANUAL_FULFILLMENT_INSTRUCTIONS_KEY = "manual_fulfillment_instructions"
 # hình, public router fallback về org đầu tiên có sản phẩm active.
 PUBLIC_ORG_ID_KEY = "public_org_id"
 
+# Guest checkout (mua không cần đăng nhập) + thông báo.
+GUEST_CHECKOUT_ENABLED_KEY = "guest_checkout_enabled"
+# Đơn NCC giao TỰ ĐỘNG (AUTO): bật => tự gọi NCC ngay sau khi khách trả tiền;
+# tắt => chờ admin bấm duyệt.
+GUEST_AUTO_FULFILL_KEY = "guest_auto_fulfill"
+TELEGRAM_BOT_TOKEN_KEY = "telegram_bot_token"
+TELEGRAM_CHAT_ID_KEY = "telegram_chat_id"
+SMTP_HOST_KEY = "smtp_host"
+SMTP_PORT_KEY = "smtp_port"
+SMTP_USER_KEY = "smtp_user"
+SMTP_PASSWORD_KEY = "smtp_password"
+SMTP_FROM_KEY = "smtp_from"
+SMTP_USE_TLS_KEY = "smtp_use_tls"
+# URL gốc trang công khai — dùng dựng link tra cứu đơn gửi cho khách.
+SITE_BASE_URL_KEY = "site_base_url"
+
+# SMS cho khách (tùy chọn) — điểm cắm nhà cung cấp SMS/Zalo ZNS. Chưa cấu hình => no-op.
+# provider: "" (tắt) | "esms" | "speedsms" | "generic_http". Xem notifications.send_customer_sms.
+SMS_PROVIDER_KEY = "sms_provider"
+SMS_API_KEY_KEY = "sms_api_key"
+SMS_API_SECRET_KEY = "sms_api_secret"
+SMS_BRANDNAME_KEY = "sms_brandname"
+SMS_ENDPOINT_KEY = "sms_endpoint"  # cho generic_http: URL nhận {phone, message}
+
+# Đồng bộ catalog tự động (scheduler nền). Tắt mặc định để không gọi NCC ngoài ý muốn.
+CATALOG_SYNC_ENABLED_KEY = "catalog_sync_enabled"
+# Chu kỳ chạy tự động (phút). 0/nhỏ hơn 5 => coi như tắt để tránh spam API NCC.
+CATALOG_SYNC_INTERVAL_MINUTES_KEY = "catalog_sync_interval_minutes"
+# Tự đánh dấu NGƯNG BÁN sản phẩm không còn trong catalog NCC (out_of_stock + inactive).
+CATALOG_SYNC_DISCONTINUE_MISSING_KEY = "catalog_sync_discontinue_missing"
+# Gửi Telegram tóm tắt khi sync tự động có thay đổi/cảnh báo/lỗi.
+CATALOG_SYNC_NOTIFY_KEY = "catalog_sync_notify"
+
+
 
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
     setting = db.scalars(select(Setting).where(Setting.key == key)).first()
     return setting.value if setting else default
+
+
+def get_bool(db: Session, key: str, default: bool = False) -> bool:
+    """Đọc setting boolean — chấp nhận '1'/'true'/'on'/'yes' (không phân biệt hoa thường)."""
+    raw = get_value(db, key, None)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "on", "yes"}
 
 
 def set_value(db: Session, key: str, value: str, description: str | None = None) -> Setting:
@@ -59,6 +101,21 @@ def get_default_markup_percent(db: Session) -> Decimal:
     except (InvalidOperation, ValueError):
         return Decimal("0")
     return value if value >= 0 else Decimal("0")
+
+
+def get_catalog_sync_config(db: Session) -> dict[str, bool | int]:
+    """Cấu hình đồng bộ catalog tự động — tắt mặc định để tránh gọi NCC ngoài ý muốn."""
+    raw_interval = get_value(db, CATALOG_SYNC_INTERVAL_MINUTES_KEY, "60")
+    try:
+        interval = int(raw_interval or "60")
+    except (TypeError, ValueError):
+        interval = 60
+    return {
+        "enabled": get_bool(db, CATALOG_SYNC_ENABLED_KEY, False),
+        "interval_minutes": max(interval, 0),
+        "discontinue_missing": get_bool(db, CATALOG_SYNC_DISCONTINUE_MISSING_KEY, True),
+        "notify": get_bool(db, CATALOG_SYNC_NOTIFY_KEY, True),
+    }
 
 
 def get_manual_fulfillment_config(db: Session) -> dict[str, str | None]:

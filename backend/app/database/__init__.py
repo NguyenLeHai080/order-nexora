@@ -4,6 +4,13 @@ Import module này (hoặc app.main) trước khi gọi Base.metadata.create_all
 """
 from app.modules.categories.models import Category  # noqa: F401
 from app.modules.content.models import Article, Faq  # noqa: F401
+from app.modules.engagement.models import Engagement  # noqa: F401
+from app.modules.finance.models import (  # noqa: F401
+    CashEntry,
+    SupplierSettlement,
+    WalletTransaction,
+    WithdrawalRequest,
+)
 from app.modules.inventory.models import StockMovement  # noqa: F401
 from app.modules.invoices.models import Invoice  # noqa: F401
 from app.modules.log_activities.models import LogActivity  # noqa: F401
@@ -12,6 +19,8 @@ from app.modules.organizations.models import Organization  # noqa: F401
 from app.modules.partner.models import (  # noqa: F401
     ProviderOrderRef,
     ProviderWebhookEvent,
+    SupplierSyncItem,
+    SupplierSyncRun,
 )
 from app.modules.payments.models import BankAccount, Deposit  # noqa: F401
 from app.modules.permissions.models import Permission, Role, role_permissions  # noqa: F401

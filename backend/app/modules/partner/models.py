@@ -2,14 +2,16 @@
 
 - ProviderOrderRef: liên kết Order nội bộ ↔ đơn phía nhà cung cấp (1-1 theo driver).
 - ProviderWebhookEvent: log VD-Event-Id đã xử lý để chống trùng (dedup) + audit.
+- SupplierSyncRun/SupplierSyncItem: nhật ký đồng bộ catalog, preview, cảnh báo biên lãi.
 
-Cả hai dùng `driver` để hỗ trợ nhiều nhà cung cấp về sau (vdstore, ...).
+Các bảng dùng `driver`/`supplier_id` để hỗ trợ nhiều nhà cung cấp về sau (vdstore, ...).
 """
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -73,3 +75,66 @@ class ProviderWebhookEvent(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     # received | processed | skipped | failed
     status: Mapped[str] = mapped_column(String(20), default="received", index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SupplierSyncRun(PKMixin, TimestampMixin, OrgScopedMixin, Base):
+    """Một lần preview/apply đồng bộ catalog NCC.
+
+    Run giúp admin biết mỗi lần sync tạo/cập nhật/ngưng bán gì, sync do ai chạy
+    (admin hay scheduler) và lỗi/cảnh báo biên lãi nằm ở đâu.
+    """
+
+    __tablename__ = "supplier_sync_runs"
+
+    supplier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    driver: Mapped[str] = mapped_column(String(50), index=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mode: Mapped[str] = mapped_column(String(20), default="manual", index=True)  # manual|dry_run|scheduled
+    status: Mapped[str] = mapped_column(String(20), default="running", index=True)  # running|success|failed|skipped
+    livemode: Mapped[bool] = mapped_column(default=False)
+
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    created_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_count: Mapped[int] = mapped_column(Integer, default=0)
+    discontinued_count: Mapped[int] = mapped_column(Integer, default=0)
+    reactivated_count: Mapped[int] = mapped_column(Integer, default=0)
+    unchanged_count: Mapped[int] = mapped_column(Integer, default=0)
+    warning_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    requested_by: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
+
+
+class SupplierSyncItem(PKMixin, TimestampMixin, OrgScopedMixin, Base):
+    """Chi tiết thay đổi/cảnh báo trong một SupplierSyncRun."""
+
+    __tablename__ = "supplier_sync_items"
+
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("supplier_sync_runs.id", ondelete="CASCADE"), index=True
+    )
+    supplier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    product_id: Mapped[int | None] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    product_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    action: Mapped[str] = mapped_column(String(30), index=True)  # create|update|discontinue|reactivate|warning|error
+    warning_code: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    old_base_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    new_base_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    old_sale_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    new_sale_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    margin_after: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    stock_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)

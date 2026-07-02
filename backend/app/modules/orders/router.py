@@ -15,7 +15,7 @@ from app.modules.auth.dependencies import get_context, get_current_user, require
 from app.modules.inventory.models import StockMovement
 from app.modules.orders import service
 from app.modules.orders.models import Order
-from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderOut
+from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderFulfill, OrderOut, OrderRefund
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/orders", tags=["Sales & Analytics"])
@@ -182,13 +182,70 @@ def leaderboard(
     return success(data)
 
 
-@router.get("", summary="Lịch sử đơn hàng")
-def index(
-    params: ListParams = Depends(list_params),
+@router.get("/alerts", summary="Cảnh báo đơn cần xử lý (cho thông báo admin real-time)")
+def alerts(
     ctx: RequestContext = Depends(require("orders.index")),
     db: Session = Depends(get_db),
 ) -> dict:
-    items, total = _paginate_orders(db, params, ctx.organization_id)
+    """Tóm tắt đơn cần chú ý để admin poll định kỳ (thông báo không cần load trang).
+
+    Trả số đơn đang chờ xử lý (`processing`) + chờ thanh toán (`awaiting_payment`),
+    id đơn lớn nhất (để FE phát hiện đơn mới), và vài đơn mới nhất cần xử lý.
+    """
+    base = select(Order)
+    if ctx.organization_id is not None:
+        base = base.where(Order.organization_id == ctx.organization_id)
+
+    def _count(status: str) -> int:
+        stmt = base.where(Order.status == status)
+        return db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    processing_count = _count("processing")
+    awaiting_count = _count("awaiting_payment")
+
+    # Đơn mới nhất cần xử lý (đã thanh toán, chờ giao) — hiện trong dropdown chuông.
+    recent_stmt = base.where(Order.status == "processing").order_by(Order.id.desc()).limit(10)
+    recent = list(db.scalars(recent_stmt).all())
+
+    # id lớn nhất trong nhóm cần xử lý — FE so sánh để biết có đơn mới.
+    latest_id = recent[0].id if recent else 0
+
+    return success(
+        {
+            "processing_count": processing_count,
+            "awaiting_count": awaiting_count,
+            "latest_id": latest_id,
+            "recent": [
+                {
+                    "id": o.id,
+                    "code": o.code,
+                    "status": o.status,
+                    "product_name": o.product_name,
+                    "quantity": o.quantity,
+                    "total_amount": str(o.total_amount),
+                    "guest_name": o.guest_name,
+                    "guest_phone": o.guest_phone,
+                    "is_guest": o.user_id is None,
+                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+                }
+                for o in recent
+            ],
+        }
+    )
+
+
+@router.get("", summary="Lịch sử đơn hàng")
+def index(
+    params: ListParams = Depends(list_params),
+    customer_type: str | None = Query(None, pattern="^(guest|account)$", description="Lọc guest | account"),
+    payment_status: str | None = Query(None, pattern="^(paid|unpaid)$", description="Lọc theo thanh toán"),
+    ctx: RequestContext = Depends(require("orders.index")),
+    db: Session = Depends(get_db),
+) -> dict:
+    items, total = _paginate_orders(
+        db, params, ctx.organization_id, customer_type=customer_type, payment_status=payment_status
+    )
     return paginated([_out(i) for i in items], total, params.page, params.limit)
 
 
@@ -243,12 +300,100 @@ def cancel(
     return success(_out(order), "Đã hủy đơn hàng và hoàn tiền vào ví.")
 
 
-def _paginate_orders(db: Session, params: ListParams, organization_id: int | None):
+@router.post("/{order_id}/mark-paid", summary="[Admin] Xác nhận đơn đã thanh toán (thủ công)")
+def mark_paid(
+    order_id: int,
+    _ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    if not obj.payment_reference:
+        raise ForbiddenError("Đơn này không dùng thanh toán trực tiếp.")
+    service.mark_order_paid(db, obj.payment_reference)
+    db.refresh(obj)
+    return success(_out(obj), "Đã xác nhận thanh toán, đơn chuyển sang xử lý.")
+
+
+@router.post("/{order_id}/fulfill", summary="[Admin] Duyệt đơn — thành công/thất bại")
+def fulfill(
+    order_id: int,
+    body: OrderFulfill,
+    ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.fulfill_order_admin(
+        db, obj, result=body.result, delivered_content=body.delivered_content,
+        note=body.note, actor_id=ctx.user_id,
+    )
+    return success(_out(order), "Đã cập nhật kết quả đơn hàng.")
+
+
+@router.post("/{order_id}/retry-provider", summary="[Admin] Lấy hàng từ nhà cung cấp")
+def retry_provider(
+    order_id: int,
+    _ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.retry_provider(db, obj)
+    return success(_out(order), "Đã gọi nhà cung cấp lấy hàng.")
+
+
+@router.post("/{order_id}/mark-refunded", summary="[Admin] Đánh dấu đã hoàn tiền (đơn guest thất bại)")
+def mark_refunded(
+    order_id: int,
+    body: OrderRefund,
+    ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.mark_guest_refunded(db, obj, note=body.note, actor_id=ctx.user_id)
+    return success(_out(order), "Đã ghi nhận hoàn tiền cho khách.")
+
+
+def _paginate_orders(
+    db: Session,
+    params: ListParams,
+    organization_id: int | None,
+    *,
+    customer_type: str | None = None,
+    payment_status: str | None = None,
+):
     stmt = select(Order)
     if organization_id is not None:
         stmt = stmt.where(Order.organization_id == organization_id)
     if params.status:
         stmt = stmt.where(Order.status == params.status)
+    if payment_status:
+        stmt = stmt.where(Order.payment_status == payment_status)
+    if customer_type == "guest":
+        stmt = stmt.where(Order.user_id.is_(None))
+    elif customer_type == "account":
+        stmt = stmt.where(Order.user_id.isnot(None))
+    if params.search:
+        # Tìm theo mã đơn, mã thanh toán, tên/SĐT/email khách vãng lai, tên sản phẩm.
+        kw = f"%{params.search.strip()}%"
+        stmt = stmt.where(
+            Order.code.ilike(kw)
+            | Order.payment_reference.ilike(kw)
+            | Order.guest_name.ilike(kw)
+            | Order.guest_phone.ilike(kw)
+            | Order.guest_email.ilike(kw)
+            | Order.product_name.ilike(kw)
+        )
+    if params.from_date:
+        stmt = stmt.where(Order.created_at >= datetime.combine(params.from_date, time.min))
+    if params.to_date:
+        stmt = stmt.where(Order.created_at <= datetime.combine(params.to_date, time.max))
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     stmt = stmt.order_by(Order.id.desc()).limit(params.limit).offset(params.offset)
     return list(db.scalars(stmt).all()), total
