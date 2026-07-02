@@ -54,6 +54,62 @@ export interface ProviderWebhookEvent {
   created_at: string | null;
 }
 
+export interface CatalogSyncRun {
+  id: number;
+  supplier_id: number | null;
+  driver: string;
+  supplier_name: string | null;
+  mode: string;
+  status: string;
+  livemode: boolean;
+  total: number;
+  created_count: number;
+  updated_count: number;
+  discontinued_count: number;
+  reactivated_count: number;
+  unchanged_count: number;
+  warning_count: number;
+  error_count: number;
+  requested_by: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  created_at: string | null;
+}
+
+export interface CatalogSyncItem {
+  id: number;
+  run_id: number;
+  product_id: number | null;
+  external_id: string | null;
+  product_name: string | null;
+  action: string;
+  warning_code: string | null;
+  note: string | null;
+  old_base_price: string | null;
+  new_base_price: string | null;
+  old_sale_price: string | null;
+  new_sale_price: string | null;
+  margin_after: string | null;
+  stock_status: string | null;
+  payload: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface CatalogSyncResult {
+  run_id: number;
+  dry_run: boolean;
+  total: number;
+  created: number;
+  updated: number;
+  discontinued: number;
+  reactivated: number;
+  unchanged: number;
+  warnings: number;
+  errors: number;
+  livemode: boolean;
+}
+
 export interface WebhookConfig {
   supplier_id: number | null;
   driver: string;
@@ -101,6 +157,11 @@ export function useIntegrations() {
     sort_by: 'created_at',
     sort_order: 'desc',
   });
+  const syncRuns = useList<CatalogSyncRun>('/partner/sync-runs', {
+    limit: 10,
+    sort_by: 'created_at',
+    sort_order: 'desc',
+  });
 
   const fetchDrivers = useCallback(async () => {
     setDriversLoading(true);
@@ -133,6 +194,13 @@ export function useIntegrations() {
     setEventStatus: events.setStatus,
     setEventPage: events.setPage,
     refetchEvents: events.refetch,
+    syncRuns: syncRuns.data,
+    syncRunsMeta: syncRuns.meta,
+    syncRunsLoading: syncRuns.loading,
+    syncRunsQuery: syncRuns.query,
+    setSyncRunStatus: syncRuns.setStatus,
+    setSyncRunPage: syncRuns.setPage,
+    refetchSyncRuns: syncRuns.refetch,
   };
 }
 
@@ -170,7 +238,9 @@ export const integrationActions = {
   updateSupplier: (id: number, body: Record<string, unknown>) => apiClient.put(`/suppliers/${id}`, body),
   removeSupplier: (id: number) => apiClient.delete(`/suppliers/${id}`),
   getBalance: (supplierId: number) => apiClient.get(`/partner/${supplierId}/balance`),
-  syncCatalog: (supplierId: number) => apiClient.post(`/partner/${supplierId}/sync-catalog`),
+  syncCatalog: (supplierId: number, body: { dry_run?: boolean; discontinue_missing?: boolean } = {}) =>
+    apiClient.post(`/partner/${supplierId}/sync-catalog`, body),
+  getSyncRunItems: (runId: number) => apiClient.get(`/partner/sync-runs/${runId}/items`),
   getWebhookConfig: (driver: string) => apiClient.get(`/partner/webhook-config/${driver}`),
   generateSecret: (driver: string, environment: 'test' | 'live') =>
     apiClient.post(`/partner/webhook-config/${driver}/generate-secret`, { environment }),

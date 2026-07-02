@@ -48,3 +48,22 @@ def toggle_maintenance(
     service.set_value(db, service.MAINTENANCE_KEY, "1" if body.enabled else "0", "Chế độ bảo trì")
     msg = "Đã bật chế độ bảo trì." if body.enabled else "Đã tắt chế độ bảo trì."
     return success({"enabled": body.enabled}, msg)
+
+
+@router.post("/test-telegram", summary="Gửi tin nhắn Telegram thử")
+def test_telegram(
+    db: Session = Depends(get_db),
+    _ctx: RequestContext = Depends(require("settings.update")),
+) -> dict:
+    """Gửi thử một tin nhắn Telegram để admin kiểm tra cấu hình bot token + chat id."""
+    from app.modules.notifications import service as notification_service
+
+    ok = notification_service.notify_admin(
+        db, "✅ Nexora: cấu hình thông báo Telegram hoạt động."
+    )
+    if not ok:
+        return success(
+            {"sent": False},
+            "Chưa gửi được. Kiểm tra lại bot token / chat id (hoặc đã điền chưa).",
+        )
+    return success({"sent": True}, "Đã gửi tin nhắn thử tới Telegram.")

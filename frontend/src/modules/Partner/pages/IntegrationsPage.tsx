@@ -10,10 +10,12 @@ import { useAuthStore } from '../../../core/authStore';
 import { formatDateTime } from '../../../core/format';
 import { extractError } from '../../../core/useList';
 import { Button } from '../../../ui';
+import CatalogSyncModal from '../components/CatalogSyncModal';
 import ProviderConfigModal from '../components/ProviderConfigModal';
 import {
   integrationActions,
   useIntegrations,
+  type CatalogSyncRun,
   type DriverDescriptor,
   type IntegrationSupplier,
   type ProviderWebhookEvent,
@@ -24,6 +26,13 @@ const EVENT_STATUS_OPTIONS = [
   { value: 'processed', label: 'Processed' },
   { value: 'skipped', label: 'Skipped' },
   { value: 'failed', label: 'Failed' },
+];
+
+const SYNC_STATUS_OPTIONS = [
+  { value: 'running', label: 'Đang chạy' },
+  { value: 'success', label: 'Thành công' },
+  { value: 'failed', label: 'Lỗi' },
+  { value: 'skipped', label: 'Bỏ qua' },
 ];
 
 export default function IntegrationsPage() {
@@ -41,12 +50,20 @@ export default function IntegrationsPage() {
     setEventStatus,
     setEventPage,
     refetchEvents,
+    syncRuns,
+    syncRunsMeta,
+    syncRunsLoading,
+    syncRunsQuery,
+    setSyncRunStatus,
+    setSyncRunPage,
+    refetchSyncRuns,
   } = useIntegrations();
 
   const [modalDriver, setModalDriver] = useState<DriverDescriptor | null>(null);
   const [editing, setEditing] = useState<IntegrationSupplier | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [deleting, setDeleting] = useState<IntegrationSupplier | null>(null);
+  const [syncSupplier, setSyncSupplier] = useState<IntegrationSupplier | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'danger' | 'info'; message: string } | null>(null);
 
@@ -90,18 +107,8 @@ export default function IntegrationsPage() {
     }
   }
 
-  async function handleSync(supplier: IntegrationSupplier) {
-    setBusy(supplier.id);
-    setToast(null);
-    try {
-      const res = await integrationActions.syncCatalog(supplier.id);
-      const d = res.data.data;
-      setToast({ type: 'success', message: `Đồng bộ ${supplier.name}: ${d.created} mới, ${d.updated} cập nhật.` });
-    } catch (err) {
-      setToast({ type: 'danger', message: extractError(err) });
-    } finally {
-      setBusy(null);
-    }
+  function handleSync(supplier: IntegrationSupplier) {
+    setSyncSupplier(supplier);
   }
 
   const columns: Column<IntegrationSupplier>[] = [
@@ -200,6 +207,19 @@ export default function IntegrationsPage() {
     { key: 'created_at', header: 'Nhận lúc', render: (e) => formatDateTime(e.created_at) },
   ];
 
+  const syncColumns: Column<CatalogSyncRun>[] = [
+    { key: 'id', header: '#', render: (r) => <span className="fw-semibold">#{r.id}</span> },
+    { key: 'supplier_name', header: 'NCC', render: (r) => r.supplier_name ?? '-' },
+    { key: 'mode', header: 'Chế độ', render: (r) => <Badge bg={r.mode === 'scheduled' ? 'info' : r.mode === 'dry_run' ? 'secondary' : 'primary'}>{r.mode}</Badge> },
+    { key: 'status', header: 'Trạng thái', render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'total', header: 'Tổng', render: (r) => r.total },
+    { key: 'created_count', header: 'Mới', render: (r) => <span className="text-success fw-semibold">{r.created_count}</span> },
+    { key: 'updated_count', header: 'Cập nhật', render: (r) => <span className="text-primary fw-semibold">{r.updated_count}</span> },
+    { key: 'discontinued_count', header: 'Ngưng', render: (r) => <span className="text-warning fw-semibold">{r.discontinued_count}</span> },
+    { key: 'warning_count', header: 'Cảnh báo', render: (r) => <span className={r.warning_count ? 'text-danger fw-semibold' : ''}>{r.warning_count}</span> },
+    { key: 'started_at', header: 'Bắt đầu', render: (r) => formatDateTime(r.started_at) },
+  ];
+
   return (
     <>
       <PageHeader
@@ -208,7 +228,7 @@ export default function IntegrationsPage() {
         infoKey="integrations"
         actions={
           <Button variant="light" icon="arrow-clockwise"
-            onClick={() => { void refetchSuppliers(); void refetchEvents(); }}>
+            onClick={() => { void refetchSuppliers(); void refetchEvents(); void refetchSyncRuns(); }}>
             Tải lại
           </Button>
         }
@@ -232,6 +252,26 @@ export default function IntegrationsPage() {
         loading={suppliersLoading}
         empty="Chưa kết nối nhà cung cấp nào."
       />
+
+      <div className="mt-4">
+        <h6 className="fw-semibold mb-2">Lịch sử đồng bộ catalog</h6>
+        <DataTable
+          columns={syncColumns}
+          rows={syncRuns}
+          loading={syncRunsLoading}
+          empty="Chưa có lần đồng bộ catalog nào."
+          toolbar={
+            <ListToolbar
+              search=""
+              onSearch={() => undefined}
+              status={syncRunsQuery.status}
+              onStatus={setSyncRunStatus}
+              statusOptions={SYNC_STATUS_OPTIONS}
+            />
+          }
+          footer={<Paginator meta={syncRunsMeta} onChange={setSyncRunPage} />}
+        />
+      </div>
 
       {hasWebhookDriver && (
         <div className="mt-4">
@@ -261,6 +301,12 @@ export default function IntegrationsPage() {
         editing={editing}
         onClose={() => setShowModal(false)}
         onSaved={() => { void refetchSuppliers(); }}
+      />
+      <CatalogSyncModal
+        show={!!syncSupplier}
+        supplier={syncSupplier}
+        onClose={() => setSyncSupplier(null)}
+        onDone={() => { void refetchSuppliers(); void refetchSyncRuns(); }}
       />
       <ConfirmDialog
         show={!!deleting}

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -24,7 +24,7 @@ class Article(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     category: Mapped[str] = mapped_column(String(120), default="")
     # key danh mục để lọc tab trên FE (vd "ai" | "domain" | "vps" | "tech").
     category_key: Mapped[str] = mapped_column(String(60), default="all", index=True)
-    # Nhóm trang: tips | news (quyết định listing + breadcrumb + bài liên quan).
+    # Nhóm trang: tips | news | policy (quyết định listing + breadcrumb + bài liên quan).
     group: Mapped[str] = mapped_column(String(20), default="tips", index=True)
     author: Mapped[str | None] = mapped_column(String(120), nullable=True)
     excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -36,6 +36,10 @@ class Article(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    # Cho phép admin ẩn/hiện bài viết trên landing (độc lập với status).
+    show_on_landing: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), index=True
+    )
 
 
 class Faq(PKMixin, TimestampMixin, OrgScopedMixin, Base):
@@ -47,3 +51,7 @@ class Faq(PKMixin, TimestampMixin, OrgScopedMixin, Base):
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    # Cho phép admin ẩn/hiện FAQ trên landing (độc lập với status).
+    show_on_landing: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), index=True
+    )

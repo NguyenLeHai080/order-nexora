@@ -153,7 +153,13 @@ def confirm_deposit(
     if deposit.status != "success" and body.status == "success":
         user = db.get(User, deposit.user_id)
         if user:
-            user.balance = (user.balance or Decimal("0")) + deposit.amount
+            from app.modules.finance import service as finance_service
+
+            finance_service.post_wallet_txn(
+                db, user, type="deposit", direction="in", amount=deposit.amount,
+                organization_id=deposit.organization_id, ref_type="deposit", ref_id=deposit.id,
+                note="Nạp tiền (xác nhận thủ công)", actor_id=_ctx.user_id,
+            )
     deposit.status = body.status
     deposit.note = body.note
     db.commit()

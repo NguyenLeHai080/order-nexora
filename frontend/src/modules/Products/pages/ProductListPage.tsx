@@ -9,6 +9,7 @@ import ListToolbar from '../../../components/ListToolbar';
 import Paginator from '../../../components/Paginator';
 import StatusBadge from '../../../components/StatusBadge';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import LandingToggle from '../../../components/LandingToggle';
 import { Button } from '../../../ui';
 import ProductFormModal, { type SupplierOpt, type CategoryOpt } from '../components/ProductFormModal';
 import PriceCalculatorModal from '../components/PriceCalculatorModal';
@@ -204,6 +205,17 @@ export default function ProductListPage() {
     },
     { key: 'stock_status', header: 'Kho', render: (p) => <StatusBadge status={p.stock_status} /> },
     { key: 'status', header: 'Trạng thái', render: (p) => <StatusBadge status={p.status} /> },
+    {
+      key: 'show_on_landing',
+      header: 'Hiện landing',
+      render: (p) => (
+        <LandingToggle
+          value={p.show_on_landing}
+          disabled={!can('update', 'Product')}
+          onToggle={async (next) => { await productActions.update(p.id, { show_on_landing: next }); }}
+        />
+      ),
+    },
     {
       key: 'actions',
       header: '',

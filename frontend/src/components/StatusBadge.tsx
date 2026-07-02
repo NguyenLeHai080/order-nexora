@@ -6,6 +6,7 @@ const MAP: Record<string, { bg: string; label: string }> = {
   inactive: { bg: 'secondary-subtle', label: 'Tạm ngưng' },
   locked: { bg: 'danger-subtle', label: 'Đã khóa' },
   pending: { bg: 'warning-subtle', label: 'Chờ xử lý' },
+  awaiting_payment: { bg: 'warning-subtle', label: 'Chờ thanh toán' },
   processing: { bg: 'info-subtle', label: 'Đang xử lý' },
   success: { bg: 'success-subtle', label: 'Thành công' },
   failed: { bg: 'danger-subtle', label: 'Thất bại' },

@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException, NotFoundError
+from app.modules.finance import service as finance_service
 from app.modules.inventory.service import apply_movement, uses_local_stock
 from app.modules.invoices import service as invoice_service
 from app.modules.orders import service as order_service
@@ -114,7 +115,11 @@ def _complete_return(
     """Trả hàng: hoàn toàn bộ tiền + hồi kho sản phẩm gốc + đơn -> cancelled."""
     refund = order.total_amount or Decimal("0")
     if user is not None:
-        user.balance = (user.balance or Decimal("0")) + refund
+        finance_service.post_wallet_txn(
+            db, user, type="refund", direction="in", amount=refund,
+            organization_id=order.organization_id, ref_type="return", ref_id=req.id,
+            note="Hoàn tiền: trả hàng", actor_id=req.user_id,
+        )
     order_service.reverse_owner_profit(db, order)
     req.refund_amount = refund
 
@@ -208,7 +213,12 @@ def _complete_exchange(
     delta = (new_unit - old_unit) * Decimal(qty)
     if user is not None and delta != 0:
         # delta>0 khách trả thêm (trừ ví); delta<0 hoàn lại (cộng ví).
-        user.balance = (user.balance or Decimal("0")) - delta
+        # post_wallet_txn tự chuẩn hóa dấu: amount âm sẽ đảo direction.
+        finance_service.post_wallet_txn(
+            db, user, type="adjustment", direction="out", amount=delta,
+            organization_id=order.organization_id, ref_type="return", ref_id=req.id,
+            note="Chênh lệch đổi hàng", actor_id=req.user_id, allow_negative=True,
+        )
     req.refund_amount = -delta if delta < 0 else Decimal("0")
     req.resolution_note = (
         f"Đổi sang '{new_product.name}'. Chênh lệch: {delta} (âm = hoàn cho khách)."

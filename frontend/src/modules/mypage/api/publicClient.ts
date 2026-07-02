@@ -28,6 +28,7 @@ export interface PublicProduct {
   stock_status: string;
   sold_count: number;
   created_at?: string | null; // ngày tạo (hiển thị trên card dịch vụ)
+  rating?: { average: number; count: number }; // chỉ có ở endpoint chi tiết
 }
 
 export interface PublicCategory {
@@ -70,7 +71,7 @@ export interface PublicFaq {
 }
 
 export interface PublicArticleParams {
-  group?: 'tips' | 'news';
+  group?: 'tips' | 'news' | 'policy';
   category_key?: string;
   limit?: number;
   page?: number;

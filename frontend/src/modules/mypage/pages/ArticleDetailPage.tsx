@@ -3,9 +3,13 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import MyPageShell from '../components/MyPageShell';
 import PageHeader from '../components/layout/PageHeader';
 import ArticleCard from '../components/cards/ArticleCard';
+import EngagementList from '../components/engagement/EngagementList';
+import CommentForm from '../components/engagement/CommentForm';
 import { useSmartNav } from '../components/layout/useSmartNav';
 import { BRAND } from '../data/siteData';
 import { usePublicArticle, articleHeroFromSlug } from '../hooks/usePublicContent';
+import { usePublicComments } from '../hooks/usePublicEngagement';
+import { submitComment } from '../api/engagementClient';
 
 /**
  * Trang chi tiết 1 bài viết (route public `/bai-viet/:slug`) — dựng theo trang
@@ -15,6 +19,7 @@ import { usePublicArticle, articleHeroFromSlug } from '../hooks/usePublicContent
 export default function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { article, related, loading } = usePublicArticle(slug);
+  const comments = usePublicComments(article?.id);
   const nav = useSmartNav();
   useScrollReveal([slug, loading]);
 
@@ -51,7 +56,9 @@ export default function ArticleDetailPage() {
   const groupCrumb =
     article.group === 'tips'
       ? { label: 'Thủ thuật', href: '/danh-muc/thu-thuat' }
-      : { label: 'Tin tức', href: '/danh-muc/tin-tuc' };
+      : article.group === 'policy'
+        ? { label: 'Chính sách', href: '/danh-muc/chinh-sach' }
+        : { label: 'Tin tức', href: '/danh-muc/tin-tuc' };
   const shareUrl = typeof window !== 'undefined' ? window.location.href : article.href;
 
   return (
@@ -110,6 +117,29 @@ export default function ArticleDetailPage() {
             >
               Z
             </a>
+          </div>
+
+          {/* Bình luận */}
+          <div className="tw-mt-10 tw-border-t tw-border-neutral-200 tw-pt-8">
+            <h2 className="tw-mb-5 tw-flex tw-items-center tw-gap-2 tw-text-[18px] tw-font-bold tw-text-ink">
+              <i className="bi bi-chat-left-text tw-text-gold" />
+              Bình luận
+              {comments.items.length > 0 && (
+                <span className="tw-text-[15px] tw-font-normal tw-text-neutral-400">({comments.items.length})</span>
+              )}
+            </h2>
+            <div className="tw-mb-6">
+              <CommentForm
+                placeholder="Chia sẻ suy nghĩ của bạn về bài viết…"
+                submitLabel="Gửi bình luận"
+                onSubmit={async (body) => {
+                  const msg = await submitComment(article.id, body);
+                  comments.reload();
+                  return msg;
+                }}
+              />
+            </div>
+            <EngagementList items={comments.items} emptyText="Chưa có bình luận. Hãy là người đầu tiên chia sẻ!" />
           </div>
         </div>
       </section>

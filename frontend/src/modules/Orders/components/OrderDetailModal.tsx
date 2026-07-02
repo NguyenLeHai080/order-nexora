@@ -10,6 +10,7 @@ interface Props {
 
 export default function OrderDetailModal({ order, onClose }: Props) {
   const hasManualSupport = !!order?.manual_fulfillment_required;
+  const isGuest = !!order && !order.user_id;
 
   return (
     <Modal show={!!order} onHide={onClose} centered size="lg">
@@ -21,6 +22,19 @@ export default function OrderDetailModal({ order, onClose }: Props) {
           <dl className="row mb-0">
             <dt className="col-5">Sản phẩm</dt>
             <dd className="col-7">{order.product_name}</dd>
+            <dt className="col-5">Khách hàng</dt>
+            <dd className="col-7">
+              {isGuest ? (
+                <>
+                  <span className="fw-semibold">{order.guest_name || 'Khách vãng lai'}</span>
+                  <span className="badge bg-warning-subtle text-warning ms-2">Vãng lai</span>
+                  {order.guest_phone && <div className="small text-muted">SĐT: {order.guest_phone}</div>}
+                  {order.guest_email && <div className="small text-muted">Email: {order.guest_email}</div>}
+                </>
+              ) : (
+                <span className="text-muted">Tài khoản #{order.user_id}</span>
+              )}
+            </dd>
             <dt className="col-5">Đơn giá</dt>
             <dd className="col-7">{formatCurrency(order.unit_price)}</dd>
             <dt className="col-5">Số lượng</dt>
@@ -35,6 +49,28 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             <dd className="col-7 fw-semibold text-success">{formatCurrency(order.owner_profit)}</dd>
             <dt className="col-5">Trạng thái</dt>
             <dd className="col-7"><StatusBadge status={order.status} /></dd>
+            {isGuest && (
+              <>
+                <dt className="col-5">Thanh toán</dt>
+                <dd className="col-7">
+                  {order.payment_status === 'paid' ? (
+                    <span className="text-success fw-semibold">
+                      Đã thanh toán{order.paid_at ? ` · ${formatDateTime(order.paid_at)}` : ''}
+                    </span>
+                  ) : order.payment_status === 'refunded' ? (
+                    <span className="text-warning fw-semibold">Đã hoàn tiền cho khách</span>
+                  ) : (
+                    <span className="text-warning fw-semibold">Chưa thanh toán</span>
+                  )}
+                </dd>
+                {order.payment_reference && (
+                  <>
+                    <dt className="col-5">Mã chuyển khoản</dt>
+                    <dd className="col-7 font-monospace">{order.payment_reference}</dd>
+                  </>
+                )}
+              </>
+            )}
             <dt className="col-5">Thời gian</dt>
             <dd className="col-7">{formatDateTime(order.created_at)}</dd>
             <dt className="col-12 mt-2">Nội dung đã giao</dt>

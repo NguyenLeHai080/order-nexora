@@ -3,8 +3,10 @@ import { formatCurrency, resolveAsset } from '../../../core/format';
 import { useCartStore } from '../store/cartStore';
 import {
   createDeposit,
+  placeGuestOrders,
   placeOrder,
   type DepositInfo,
+  type GuestCheckoutResult,
   type PlacedOrder,
 } from '../api/checkoutClient';
 
@@ -17,7 +19,7 @@ interface Props {
   onRequireLogin: () => void;
 }
 
-type View = 'cart' | 'processing' | 'done' | 'topup';
+type View = 'cart' | 'processing' | 'done' | 'topup' | 'guest-contact' | 'guest-qr';
 
 /** Lấy message lỗi gọn từ response axios. */
 function errMessage(e: unknown): string {
@@ -49,12 +51,19 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
   const [results, setResults] = useState<PlacedOrder[]>([]);
   const [deposit, setDeposit] = useState<DepositInfo | null>(null);
   const [topupLoading, setTopupLoading] = useState(false);
+  // Guest checkout (chưa đăng nhập): thông tin liên hệ + kết quả QR.
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestResult, setGuestResult] = useState<GuestCheckoutResult | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   const resetToCart = () => {
     setView('cart');
     setError(null);
     setResults([]);
     setDeposit(null);
+    setGuestResult(null);
   };
 
   const handleClose = () => {
@@ -68,7 +77,9 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
   const checkout = async () => {
     if (items.length === 0) return;
     if (!isLoggedIn) {
-      onRequireLogin();
+      // Khách vãng lai: sang bước nhập liên hệ (không bắt đăng nhập nữa).
+      setError(null);
+      setView('guest-contact');
       return;
     }
     setView('processing');
@@ -94,6 +105,40 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
         setError(errMessage(e));
         setView('cart');
       }
+    }
+  };
+
+  const submitGuestCheckout = async () => {
+    if (!guestName.trim()) {
+      setError('Vui lòng nhập họ tên.');
+      return;
+    }
+    if (!guestPhone.trim() && !guestEmail.trim()) {
+      setError('Vui lòng nhập số điện thoại hoặc email để nhận thông báo đơn hàng.');
+      return;
+    }
+    setGuestLoading(true);
+    setError(null);
+    try {
+      const result = await placeGuestOrders(
+        items.map((it) => ({ productId: it.productId, qty: it.qty })),
+        { name: guestName.trim(), phone: guestPhone.trim(), email: guestEmail.trim() },
+      );
+      setGuestResult(result);
+      // Lưu link tra cứu để khách quay lại (kể cả khi đóng trình duyệt).
+      try {
+        const saved = JSON.parse(localStorage.getItem('nexora-guest-orders') || '[]');
+        saved.unshift({ code: result.reference, token: result.lookup_token, at: Date.now() });
+        localStorage.setItem('nexora-guest-orders', JSON.stringify(saved.slice(0, 20)));
+      } catch {
+        /* ignore quota/parse errors */
+      }
+      clear();
+      setView('guest-qr');
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setGuestLoading(false);
     }
   };
 
@@ -130,7 +175,15 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
         <div className="tw-flex tw-items-center tw-justify-between tw-border-b tw-border-neutral-200 tw-px-5 tw-py-4">
           <h3 className="tw-flex tw-items-center tw-gap-2 tw-text-[16px] tw-font-bold tw-text-ink">
             <i className="bi bi-bag tw-text-gold-dark" />
-            {view === 'done' ? 'Đặt hàng thành công' : view === 'topup' ? 'Nạp ví thanh toán' : 'Giỏ hàng'}
+            {view === 'done'
+              ? 'Đặt hàng thành công'
+              : view === 'topup'
+                ? 'Nạp ví thanh toán'
+                : view === 'guest-contact'
+                  ? 'Thông tin nhận đơn'
+                  : view === 'guest-qr'
+                    ? 'Quét mã thanh toán'
+                    : 'Giỏ hàng'}
           </h3>
           <button
             type="button"
@@ -318,6 +371,104 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
               </button>
             </div>
           )}
+
+          {view === 'guest-contact' && (
+            <div className="tw-py-2">
+              <p className="tw-mb-4 tw-rounded-lg tw-bg-gold/10 tw-px-3 tw-py-2.5 tw-text-[13px] tw-text-neutral-700">
+                Nhập thông tin để nhận thông báo & tra cứu đơn. Bạn sẽ chuyển khoản qua QR ở bước kế tiếp.
+              </p>
+              <label className="tw-mb-1 tw-block tw-text-[13px] tw-font-semibold tw-text-ink">Họ tên *</label>
+              <input
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                className="tw-mb-3 tw-w-full tw-rounded-lg tw-border tw-border-neutral-300 tw-px-3 tw-py-2.5 tw-text-[14px] tw-outline-none focus:tw-border-gold"
+              />
+              <label className="tw-mb-1 tw-block tw-text-[13px] tw-font-semibold tw-text-ink">Số điện thoại</label>
+              <input
+                type="tel"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                placeholder="09xx xxx xxx"
+                className="tw-mb-3 tw-w-full tw-rounded-lg tw-border tw-border-neutral-300 tw-px-3 tw-py-2.5 tw-text-[14px] tw-outline-none focus:tw-border-gold"
+              />
+              <label className="tw-mb-1 tw-block tw-text-[13px] tw-font-semibold tw-text-ink">Email</label>
+              <input
+                type="email"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder="ban@email.com"
+                className="tw-mb-1 tw-w-full tw-rounded-lg tw-border tw-border-neutral-300 tw-px-3 tw-py-2.5 tw-text-[14px] tw-outline-none focus:tw-border-gold"
+              />
+              <p className="tw-mb-4 tw-text-[12px] tw-text-neutral-400">Cần ít nhất số điện thoại hoặc email.</p>
+              {error && (
+                <p className="tw-mb-3 tw-rounded-lg tw-bg-red-50 tw-px-3 tw-py-2 tw-text-[13px] tw-text-red-600">{error}</p>
+              )}
+              <button
+                type="button"
+                onClick={submitGuestCheckout}
+                disabled={guestLoading}
+                className="tw-w-full tw-rounded-full tw-bg-gradient-to-r tw-from-gold-light tw-to-gold tw-py-3 tw-text-[14px] tw-font-bold tw-text-black tw-shadow-[0_4px_14px_rgba(201,164,76,0.4)] tw-transition-all hover:-tw-translate-y-px disabled:tw-cursor-not-allowed disabled:tw-opacity-60"
+              >
+                {guestLoading ? 'Đang tạo đơn…' : `Tiếp tục · ${formatCurrency(total)}`}
+              </button>
+              <button
+                type="button"
+                onClick={onRequireLogin}
+                className="tw-mt-3 tw-w-full tw-text-[13px] tw-text-neutral-500 hover:tw-text-gold-dark"
+              >
+                Đã có tài khoản? Đăng nhập để thanh toán bằng ví
+              </button>
+              <button onClick={resetToCart} className="tw-mt-1 tw-w-full tw-text-[13px] tw-text-neutral-400 hover:tw-text-gold-dark">
+                ← Quay lại giỏ hàng
+              </button>
+            </div>
+          )}
+
+          {view === 'guest-qr' && guestResult && (
+            <div className="tw-py-2">
+              <div className="tw-rounded-xl tw-border tw-border-neutral-200 tw-bg-neutral-50 tw-p-4 tw-text-center">
+                {guestResult.qr_url ? (
+                  <img
+                    src={guestResult.qr_url}
+                    alt="VietQR"
+                    className="tw-mx-auto tw-mb-3 tw-h-56 tw-w-56 tw-rounded-lg tw-border tw-border-neutral-200 tw-bg-white tw-object-contain tw-p-1"
+                  />
+                ) : (
+                  <p className="tw-mb-3 tw-text-[13px] tw-text-amber-600">
+                    Chưa cấu hình tài khoản nhận tiền. Vui lòng liên hệ hỗ trợ để thanh toán.
+                  </p>
+                )}
+                <p className="tw-text-[13px] tw-text-neutral-500">Số tiền</p>
+                <p className="tw-mb-2 tw-text-[18px] tw-font-extrabold tw-text-gold-dark">
+                  {formatCurrency(parseFloat(guestResult.total))}
+                </p>
+                {guestResult.bank && (
+                  <div className="tw-mb-2 tw-text-[12.5px] tw-text-neutral-600">
+                    <p>{guestResult.bank.bank_name} — {guestResult.bank.account_number}</p>
+                    <p>{guestResult.bank.account_holder}</p>
+                  </div>
+                )}
+                <p className="tw-text-[12.5px] tw-text-neutral-500">Nội dung chuyển khoản</p>
+                <p className="tw-mb-3 tw-break-all tw-font-mono tw-text-[13px] tw-font-bold tw-text-gold-dark">
+                  {guestResult.reference}
+                </p>
+                <p className="tw-text-[12px] tw-text-neutral-400">
+                  Sau khi chuyển khoản, đơn sẽ được xác nhận và xử lý. Theo dõi kết quả tại trang tra cứu bên dưới.
+                </p>
+              </div>
+              <a
+                href={`/tra-cuu-don?code=${encodeURIComponent(guestResult.reference)}&token=${encodeURIComponent(guestResult.lookup_token)}`}
+                className="tw-mt-4 tw-block tw-rounded-lg tw-bg-gradient-to-r tw-from-gold-light tw-to-gold tw-py-2.5 tw-text-center tw-text-[13.5px] tw-font-bold tw-text-black hover:-tw-translate-y-px"
+              >
+                Theo dõi đơn hàng →
+              </a>
+              <button onClick={resetToCart} className="tw-mt-3 tw-w-full tw-text-[13px] tw-text-neutral-400 hover:tw-text-gold-dark">
+                ← Về giỏ hàng
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer — chỉ ở màn giỏ */}
@@ -332,7 +483,7 @@ export default function CartDrawer({ open, onClose, isLoggedIn, onRequireLogin }
               onClick={checkout}
               className="tw-w-full tw-rounded-full tw-bg-gradient-to-r tw-from-gold-light tw-to-gold tw-py-3.5 tw-text-[14px] tw-font-bold tw-uppercase tw-text-black tw-shadow-[0_4px_16px_rgba(201,164,76,0.45)] tw-transition-all hover:-tw-translate-y-px hover:tw-shadow-[0_7px_24px_rgba(201,164,76,0.6)] active:tw-translate-y-0"
             >
-              {isLoggedIn ? 'Thanh toán' : 'Đăng nhập để thanh toán'}
+              Thanh toán
             </button>
           </div>
         )}

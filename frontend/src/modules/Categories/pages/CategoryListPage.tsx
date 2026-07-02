@@ -6,6 +6,7 @@ import ListToolbar from '../../../components/ListToolbar';
 import Paginator from '../../../components/Paginator';
 import StatusBadge from '../../../components/StatusBadge';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import LandingToggle from '../../../components/LandingToggle';
 import { Button } from '../../../ui';
 import CategoryFormModal from '../components/CategoryFormModal';
 import { useCategories, categoryActions, type Category } from '../hooks/useCategories';
@@ -36,6 +37,17 @@ export default function CategoryListPage() {
     },
     { key: 'sort_order', header: 'Thứ tự', render: (c) => formatNumber(c.sort_order) },
     { key: 'status', header: 'Trạng thái', render: (c) => <StatusBadge status={c.status} /> },
+    {
+      key: 'show_on_landing',
+      header: 'Hiện landing',
+      render: (c) => (
+        <LandingToggle
+          value={c.show_on_landing}
+          disabled={!can('update', 'Categorie')}
+          onToggle={async (next) => { await categoryActions.update(c.id, { show_on_landing: next }); }}
+        />
+      ),
+    },
     {
       key: 'actions',
       header: '',
