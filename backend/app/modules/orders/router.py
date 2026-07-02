@@ -15,7 +15,7 @@ from app.modules.auth.dependencies import get_context, get_current_user, require
 from app.modules.inventory.models import StockMovement
 from app.modules.orders import service
 from app.modules.orders.models import Order
-from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderFulfill, OrderOut
+from app.modules.orders.schemas import OrderCreate, OrderCustomerOut, OrderFulfill, OrderOut, OrderRefund
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/orders", tags=["Sales & Analytics"])
@@ -238,10 +238,14 @@ def alerts(
 @router.get("", summary="Lịch sử đơn hàng")
 def index(
     params: ListParams = Depends(list_params),
+    customer_type: str | None = Query(None, pattern="^(guest|account)$", description="Lọc guest | account"),
+    payment_status: str | None = Query(None, pattern="^(paid|unpaid)$", description="Lọc theo thanh toán"),
     ctx: RequestContext = Depends(require("orders.index")),
     db: Session = Depends(get_db),
 ) -> dict:
-    items, total = _paginate_orders(db, params, ctx.organization_id)
+    items, total = _paginate_orders(
+        db, params, ctx.organization_id, customer_type=customer_type, payment_status=payment_status
+    )
     return paginated([_out(i) for i in items], total, params.page, params.limit)
 
 
@@ -342,12 +346,54 @@ def retry_provider(
     return success(_out(order), "Đã gọi nhà cung cấp lấy hàng.")
 
 
-def _paginate_orders(db: Session, params: ListParams, organization_id: int | None):
+@router.post("/{order_id}/mark-refunded", summary="[Admin] Đánh dấu đã hoàn tiền (đơn guest thất bại)")
+def mark_refunded(
+    order_id: int,
+    body: OrderRefund,
+    ctx: RequestContext = Depends(require("orders.update")),
+    db: Session = Depends(get_db),
+) -> dict:
+    obj = db.get(Order, order_id)
+    if obj is None:
+        raise NotFoundError("Không tìm thấy đơn hàng.")
+    order = service.mark_guest_refunded(db, obj, note=body.note, actor_id=ctx.user_id)
+    return success(_out(order), "Đã ghi nhận hoàn tiền cho khách.")
+
+
+def _paginate_orders(
+    db: Session,
+    params: ListParams,
+    organization_id: int | None,
+    *,
+    customer_type: str | None = None,
+    payment_status: str | None = None,
+):
     stmt = select(Order)
     if organization_id is not None:
         stmt = stmt.where(Order.organization_id == organization_id)
     if params.status:
         stmt = stmt.where(Order.status == params.status)
+    if payment_status:
+        stmt = stmt.where(Order.payment_status == payment_status)
+    if customer_type == "guest":
+        stmt = stmt.where(Order.user_id.is_(None))
+    elif customer_type == "account":
+        stmt = stmt.where(Order.user_id.isnot(None))
+    if params.search:
+        # Tìm theo mã đơn, mã thanh toán, tên/SĐT/email khách vãng lai, tên sản phẩm.
+        kw = f"%{params.search.strip()}%"
+        stmt = stmt.where(
+            Order.code.ilike(kw)
+            | Order.payment_reference.ilike(kw)
+            | Order.guest_name.ilike(kw)
+            | Order.guest_phone.ilike(kw)
+            | Order.guest_email.ilike(kw)
+            | Order.product_name.ilike(kw)
+        )
+    if params.from_date:
+        stmt = stmt.where(Order.created_at >= datetime.combine(params.from_date, time.min))
+    if params.to_date:
+        stmt = stmt.where(Order.created_at <= datetime.combine(params.to_date, time.max))
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     stmt = stmt.order_by(Order.id.desc()).limit(params.limit).offset(params.offset)
     return list(db.scalars(stmt).all()), total

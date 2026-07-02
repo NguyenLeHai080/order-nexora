@@ -81,6 +81,77 @@ def order_lookup_url(db: Session, order) -> str:  # noqa: ANN001
     return f"{base}/tra-cuu-don?code={code}&token={token}"
 
 
+def send_customer_sms(db: Session, phone: str | None, message: str) -> bool:
+    """Gửi SMS cho khách qua nhà cung cấp đã cấu hình. No-op nếu chưa cấu hình.
+
+    Điểm cắm đa nhà cung cấp — chọn qua setting `sms_provider`:
+      - "" / None: tắt (mặc định) => no-op, trả False.
+      - "esms": eSMS.vn (POST JSON ApiKey/SecretKey/Brandname/Phone/Content).
+      - "speedsms": SpeedSMS.vn (Basic auth token).
+      - "generic_http": POST JSON {phone, message} tới `sms_endpoint` tự cấu hình.
+    Bọc try/except — SMS lỗi KHÔNG được phá luồng đơn.
+    """
+    if not phone:
+        return False
+    provider = (settings_service.get_value(db, settings_service.SMS_PROVIDER_KEY) or "").strip().lower()
+    if not provider:
+        return False
+    api_key = settings_service.get_value(db, settings_service.SMS_API_KEY_KEY)
+    api_secret = settings_service.get_value(db, settings_service.SMS_API_SECRET_KEY)
+    brandname = settings_service.get_value(db, settings_service.SMS_BRANDNAME_KEY)
+    endpoint = settings_service.get_value(db, settings_service.SMS_ENDPOINT_KEY)
+
+    try:
+        if provider == "esms":
+            resp = httpx.post(
+                "https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/",
+                json={
+                    "ApiKey": api_key,
+                    "SecretKey": api_secret,
+                    "Brandname": brandname or "",
+                    "Phone": phone,
+                    "Content": message,
+                    "SmsType": "2" if brandname else "8",
+                },
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            return True
+        if provider == "speedsms":
+            resp = httpx.post(
+                "https://api.speedsms.vn/index.php/sms/send",
+                json={"to": phone, "content": message, "sms_type": 2, "sender": brandname or ""},
+                auth=(api_key or "", "x"),
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            return True
+        if provider == "generic_http" and endpoint:
+            resp = httpx.post(endpoint, json={"phone": phone, "message": message}, timeout=10.0)
+            resp.raise_for_status()
+            return True
+    except Exception as exc:  # noqa: BLE001 — SMS lỗi không được phá luồng đơn
+        logger.warning("send_customer_sms (%s) that bai: %s", provider, exc)
+        return False
+    return False
+
+
+def send_customer_sms_result(db: Session, order) -> bool:  # noqa: ANN001
+    """Gửi SMS ngắn báo kết quả đơn cho khách vãng lai (dùng SĐT nếu có)."""
+    phone = getattr(order, "guest_phone", None)
+    if not phone:
+        return False
+    if order.status == "success":
+        msg = f"Don {order.code} da hoan tat. Tra cuu: {order_lookup_url(db, order)}"
+    elif order.payment_status == "refunded":
+        msg = f"Don {order.code} da duoc hoan tien. LH neu can ho tro."
+    elif order.status == "failed":
+        msg = f"Don {order.code} xu ly khong thanh cong. LH de duoc hoan tien."
+    else:
+        msg = f"Cap nhat don {order.code}. Tra cuu: {order_lookup_url(db, order)}"
+    return send_customer_sms(db, phone, msg)
+
+
 def build_admin_order_message(db: Session, orders: list) -> str:  # noqa: ANN001
     """Tin nhắn Telegram báo admin có đơn khách vãng lai đã thanh toán."""
     if not orders:
@@ -101,6 +172,26 @@ def build_admin_order_message(db: Session, orders: list) -> str:  # noqa: ANN001
         lines.append(f"• {o.product_name} × {o.quantity} — {o.total_amount}")
     lines.append("")
     lines.append(f"<b>Tổng: {total}</b>")
+    return "\n".join(lines)
+
+
+def build_account_order_message(db: Session, order, user=None) -> str:  # noqa: ANN001
+    """Tin nhắn Telegram báo admin có đơn của khách ĐÃ ĐĂNG NHẬP cần xử lý tay.
+
+    Dùng cho đơn MANUAL (Domain/VPS...) hoặc đơn NCC còn 'processing' sau khi mua
+    bằng ví — admin cần cấp phát/bàn giao thủ công.
+    """
+    who = getattr(user, "name", None) or (f"user #{order.user_id}" if order.user_id else "N/A")
+    lines = [
+        "<b>🔔 ĐƠN CẦN XỬ LÝ TAY (khách đã đăng nhập)</b>",
+        f"Mã: <b>{order.code}</b>",
+        f"Khách: {who}",
+        "",
+        f"• {order.product_name} × {order.quantity} — {order.total_amount}",
+    ]
+    if order.note:
+        lines.append("")
+        lines.append(order.note)
     return "\n".join(lines)
 
 

@@ -34,6 +34,14 @@ SMTP_USE_TLS_KEY = "smtp_use_tls"
 # URL gốc trang công khai — dùng dựng link tra cứu đơn gửi cho khách.
 SITE_BASE_URL_KEY = "site_base_url"
 
+# SMS cho khách (tùy chọn) — điểm cắm nhà cung cấp SMS/Zalo ZNS. Chưa cấu hình => no-op.
+# provider: "" (tắt) | "esms" | "speedsms" | "generic_http". Xem notifications.send_customer_sms.
+SMS_PROVIDER_KEY = "sms_provider"
+SMS_API_KEY_KEY = "sms_api_key"
+SMS_API_SECRET_KEY = "sms_api_secret"
+SMS_BRANDNAME_KEY = "sms_brandname"
+SMS_ENDPOINT_KEY = "sms_endpoint"  # cho generic_http: URL nhận {phone, message}
+
 
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
     setting = db.scalars(select(Setting).where(Setting.key == key)).first()

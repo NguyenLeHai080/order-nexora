@@ -208,6 +208,8 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
         credit_owner_profit(db, order)
         db.commit()
         db.refresh(order)
+        # Báo admin: đơn của khách đã đăng nhập cần xử lý tay (nhất quán với chuông).
+        _notify_admin_account_order(db, order, user)
         return order
 
     # success — đã có nội dung giao.
@@ -569,3 +571,41 @@ def _notify_customer_result(db: Session, order: Order) -> None:
         notification_service.send_customer_email(db, order.guest_email, subject, html)
     except Exception:  # noqa: BLE001
         pass
+    # Gửi SMS nếu có SĐT + đã cấu hình nhà cung cấp SMS (best-effort, no-op nếu chưa).
+    try:
+        notification_service.send_customer_sms_result(db, order)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _notify_admin_account_order(db: Session, order: Order, user: User | None = None) -> None:
+    """Báo admin (Telegram) đơn của khách đã đăng nhập cần xử lý tay (best-effort)."""
+    try:
+        msg = notification_service.build_account_order_message(db, order, user)
+        notification_service.notify_admin(db, msg)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def mark_guest_refunded(db: Session, order: Order, *, note: str | None = None, actor_id: int | None = None) -> Order:
+    """Admin xác nhận ĐÃ hoàn tiền tay cho đơn guest thất bại.
+
+    Guest không có ví nên không hoàn tự động; hàm này chỉ ghi nhận đã hoàn để admin
+    không mất dấu (đảo sổ bán nếu đơn từng ghi nhận doanh thu). Idempotent qua note.
+    """
+    if order.user_id is not None:
+        raise AppException("Chỉ áp dụng cho đơn khách vãng lai.")
+    if order.status != "failed":
+        raise AppException("Chỉ đơn thất bại mới đánh dấu đã hoàn tiền.")
+    if order.payment_status == "refunded":
+        return order
+    # Đảo sổ nếu đơn này từng ghi nhận doanh thu (an toàn: chỉ đảo khi có 'out' chưa 'return').
+    reverse_owner_profit(db, order)
+    _reverse_sale_ledger(db, order, actor_id=actor_id or 0)
+    order.payment_status = "refunded"
+    order.note = note or "Đã hoàn tiền cho khách (thủ công)."
+    db.commit()
+    db.refresh(order)
+    if order.guest_email:
+        _notify_customer_result(db, order)
+    return order

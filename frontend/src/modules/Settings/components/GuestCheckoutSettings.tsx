@@ -23,7 +23,20 @@ const KEYS = {
   smtpFrom: 'smtp_from',
   smtpTls: 'smtp_use_tls',
   siteBaseUrl: 'site_base_url',
+  smsProvider: 'sms_provider',
+  smsApiKey: 'sms_api_key',
+  smsApiSecret: 'sms_api_secret',
+  smsBrandname: 'sms_brandname',
+  smsEndpoint: 'sms_endpoint',
 } as const;
+
+// Nhà cung cấp SMS hỗ trợ (khớp notifications/service.py send_customer_sms).
+const SMS_PROVIDERS = [
+  { value: '', label: 'Tắt (không gửi SMS)' },
+  { value: 'esms', label: 'eSMS.vn' },
+  { value: 'speedsms', label: 'SpeedSMS.vn' },
+  { value: 'generic_http', label: 'HTTP tùy chỉnh' },
+] as const;
 
 const BOOL_TRUE = new Set(['1', 'true', 'on', 'yes']);
 
@@ -149,6 +162,34 @@ export default function GuestCheckoutSettings({ settings, savingKey, onSave, onN
             style={{ transform: 'scale(1.3)' }}
           />
         </div>
+
+        <hr />
+        <h6 className="fw-semibold mb-3"><i className="bi bi-chat-dots text-success me-2" />SMS báo kết quả cho khách (tùy chọn)</h6>
+        <Form.Group className="mb-3">
+          <Form.Label className="small fw-semibold">Nhà cung cấp SMS</Form.Label>
+          <div className="d-flex gap-2">
+            <Form.Select value={val(KEYS.smsProvider)} onChange={(e) => set(KEYS.smsProvider, e.target.value)}>
+              {SMS_PROVIDERS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </Form.Select>
+            <Button
+              variant="outline-primary"
+              size="sm"
+              disabled={savingKey === KEYS.smsProvider}
+              onClick={() => saveText(KEYS.smsProvider)}
+            >
+              Lưu
+            </Button>
+          </div>
+          <Form.Text className="text-muted">
+            Để trống/Tắt nếu chưa dùng SMS. Cần thương hiệu (brandname) đã đăng ký với nhà mạng.
+          </Form.Text>
+        </Form.Group>
+        {textField(KEYS.smsApiKey, 'API Key', { placeholder: 'ApiKey của nhà cung cấp' })}
+        {textField(KEYS.smsApiSecret, 'API Secret', { type: 'password', placeholder: 'SecretKey (nếu có)' })}
+        {textField(KEYS.smsBrandname, 'Brandname', { placeholder: 'Tên thương hiệu đã đăng ký' })}
+        {textField(KEYS.smsEndpoint, 'Endpoint (chỉ HTTP tùy chỉnh)', { placeholder: 'https://…/send' })}
       </Card.Body>
     </Card>
   );

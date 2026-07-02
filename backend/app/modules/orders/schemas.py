@@ -41,6 +41,12 @@ class OrderFulfill(BaseModel):
     note: str | None = None
 
 
+class OrderRefund(BaseModel):
+    """Admin đánh dấu đã hoàn tiền tay cho đơn guest thất bại."""
+
+    note: str | None = None
+
+
 class OrderOut(BaseModel):
     id: int
     code: str

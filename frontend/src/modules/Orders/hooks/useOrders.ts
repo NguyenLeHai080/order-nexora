@@ -57,6 +57,9 @@ export const orderActions = {
     apiClient.post(`${ORDERS_ENDPOINT}/${id}/fulfill`, body),
   /** Gọi nhà cung cấp lấy hàng cho đơn đang xử lý. */
   retryProvider: (id: number) => apiClient.post(`${ORDERS_ENDPOINT}/${id}/retry-provider`),
+  /** Đánh dấu đã hoàn tiền tay cho đơn khách vãng lai thất bại. */
+  markRefunded: (id: number, note?: string) =>
+    apiClient.post(`${ORDERS_ENDPOINT}/${id}/mark-refunded`, { note }),
 };
 
 /** Bảng xếp hạng khách hàng theo chi tiêu. */

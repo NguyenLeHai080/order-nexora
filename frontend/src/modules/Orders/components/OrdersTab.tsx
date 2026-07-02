@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Form } from 'react-bootstrap';
 import { useAuthStore } from '../../../core/authStore';
 import { useOrders, orderActions, type Order } from '../hooks/useOrders';
 import { useOrderStore } from '../store/orderStore';
@@ -16,10 +17,11 @@ import FulfillModal from './FulfillModal';
 // Tab danh sách đơn hàng + modal chi tiết.
 export default function OrdersTab() {
   const { can } = useAuthStore();
-  const { data, meta, loading, query, setPage, setSearch, setStatus, refetch } = useOrders();
+  const { data, meta, loading, query, setPage, setSearch, setStatus, patchQuery, refetch } = useOrders();
   const store = useOrderStore();
   const [cancelling, setCancelling] = useState<Order | null>(null);
   const [markingPaid, setMarkingPaid] = useState<Order | null>(null);
+  const [refunding, setRefunding] = useState<Order | null>(null);
   const [fulfilling, setFulfilling] = useState<Order | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -85,6 +87,9 @@ export default function OrdersTab() {
           {canUpdate && (o.status === 'processing' || o.status === 'success') && (
             <Button size="sm" variant="light" icon="x-circle" className="text-danger" title="Hủy đơn" onClick={() => setCancelling(o)} />
           )}
+          {canUpdate && o.status === 'failed' && !o.user_id && o.payment_status !== 'refunded' && (
+            <Button size="sm" variant="light" icon="cash-stack" className="text-success" title="Đánh dấu đã hoàn tiền" onClick={() => setRefunding(o)} />
+          )}
         </div>
       ),
     },
@@ -103,6 +108,18 @@ export default function OrdersTab() {
             status={query.status}
             onStatus={setStatus}
             statusOptions={ORDER_STATUS_OPTIONS}
+            right={
+              <Form.Select
+                style={{ maxWidth: 170 }}
+                value={(query.customer_type as string) ?? ''}
+                onChange={(e) => patchQuery({ customer_type: e.target.value })}
+                aria-label="Lọc loại khách"
+              >
+                <option value="">Tất cả khách</option>
+                <option value="guest">Khách vãng lai</option>
+                <option value="account">Có tài khoản</option>
+              </Form.Select>
+            }
           />
         }
         footer={<Paginator meta={meta} onChange={setPage} />}
@@ -124,6 +141,14 @@ export default function OrdersTab() {
         confirmLabel="Hủy đơn"
         onConfirm={async () => { if (cancelling) await orderActions.cancel(cancelling.id); refetch(); }}
         onClose={() => setCancelling(null)}
+      />
+      <ConfirmDialog
+        show={!!refunding}
+        title="Xác nhận đã hoàn tiền"
+        message={`Đơn khách vãng lai "${refunding?.code}" đã thất bại. Xác nhận bạn ĐÃ hoàn tiền cho khách qua kênh thủ công (chuyển khoản lại)? Hệ thống sẽ ghi nhận đã hoàn và đảo doanh thu (nếu có).`}
+        confirmLabel="Đã hoàn tiền"
+        onConfirm={async () => { if (refunding) await orderActions.markRefunded(refunding.id); refetch(); }}
+        onClose={() => setRefunding(null)}
       />
     </>
   );

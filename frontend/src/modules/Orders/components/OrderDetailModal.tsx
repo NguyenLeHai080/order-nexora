@@ -57,6 +57,8 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                     <span className="text-success fw-semibold">
                       Đã thanh toán{order.paid_at ? ` · ${formatDateTime(order.paid_at)}` : ''}
                     </span>
+                  ) : order.payment_status === 'refunded' ? (
+                    <span className="text-warning fw-semibold">Đã hoàn tiền cho khách</span>
                   ) : (
                     <span className="text-warning fw-semibold">Chưa thanh toán</span>
                   )}
