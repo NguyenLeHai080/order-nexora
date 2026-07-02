@@ -42,6 +42,16 @@ SMS_API_SECRET_KEY = "sms_api_secret"
 SMS_BRANDNAME_KEY = "sms_brandname"
 SMS_ENDPOINT_KEY = "sms_endpoint"  # cho generic_http: URL nhận {phone, message}
 
+# Đồng bộ catalog tự động (scheduler nền). Tắt mặc định để không gọi NCC ngoài ý muốn.
+CATALOG_SYNC_ENABLED_KEY = "catalog_sync_enabled"
+# Chu kỳ chạy tự động (phút). 0/nhỏ hơn 5 => coi như tắt để tránh spam API NCC.
+CATALOG_SYNC_INTERVAL_MINUTES_KEY = "catalog_sync_interval_minutes"
+# Tự đánh dấu NGƯNG BÁN sản phẩm không còn trong catalog NCC (out_of_stock + inactive).
+CATALOG_SYNC_DISCONTINUE_MISSING_KEY = "catalog_sync_discontinue_missing"
+# Gửi Telegram tóm tắt khi sync tự động có thay đổi/cảnh báo/lỗi.
+CATALOG_SYNC_NOTIFY_KEY = "catalog_sync_notify"
+
+
 
 def get_value(db: Session, key: str, default: str | None = None) -> str | None:
     setting = db.scalars(select(Setting).where(Setting.key == key)).first()
@@ -91,6 +101,21 @@ def get_default_markup_percent(db: Session) -> Decimal:
     except (InvalidOperation, ValueError):
         return Decimal("0")
     return value if value >= 0 else Decimal("0")
+
+
+def get_catalog_sync_config(db: Session) -> dict[str, bool | int]:
+    """Cấu hình đồng bộ catalog tự động — tắt mặc định để tránh gọi NCC ngoài ý muốn."""
+    raw_interval = get_value(db, CATALOG_SYNC_INTERVAL_MINUTES_KEY, "60")
+    try:
+        interval = int(raw_interval or "60")
+    except (TypeError, ValueError):
+        interval = 60
+    return {
+        "enabled": get_bool(db, CATALOG_SYNC_ENABLED_KEY, False),
+        "interval_minutes": max(interval, 0),
+        "discontinue_missing": get_bool(db, CATALOG_SYNC_DISCONTINUE_MISSING_KEY, True),
+        "notify": get_bool(db, CATALOG_SYNC_NOTIFY_KEY, True),
+    }
 
 
 def get_manual_fulfillment_config(db: Session) -> dict[str, str | None]:

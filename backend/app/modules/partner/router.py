@@ -22,12 +22,15 @@ from app.core.response import paginated, success
 from app.integrations import registry
 from app.integrations.errors import ProviderError
 from app.modules.auth.dependencies import require
-from app.modules.partner import service
+from app.modules.partner import catalog_sync, service
 from app.modules.partner.repository import (
     ProviderOrderRefRepository,
     ProviderWebhookEventRepository,
 )
 from app.modules.partner.schemas import (
+    CatalogSyncItemOut,
+    CatalogSyncRequest,
+    CatalogSyncRunOut,
     PartnerWebhookConfigOut,
     PartnerWebhookConfigUpdate,
     PartnerWebhookSecretGenerate,
@@ -228,24 +231,80 @@ async def _process_webhook(supplier: Supplier, request: Request, db: Session) ->
 @router.post("/{supplier_id}/sync-catalog", summary="Đồng bộ catalog nhà cung cấp")
 def sync_catalog(
     supplier_id: int,
+    body: CatalogSyncRequest | None = None,
     db: Session = Depends(get_db),
-    _ctx: RequestContext = Depends(require("partner.update")),
+    ctx: RequestContext = Depends(require("partner.update")),
 ) -> dict:
     supplier = _get_supplier(db, supplier_id)
     _require_capability(supplier.driver, "catalog")
+    payload = body or CatalogSyncRequest()
     try:
-        result = service.sync_catalog(db, supplier)
+        result = catalog_sync.run_supplier_sync(
+            db,
+            supplier,
+            dry_run=payload.dry_run,
+            mode="dry_run" if payload.dry_run else "manual",
+            actor_id=ctx.user_id,
+            discontinue_missing=payload.discontinue_missing,
+        )
     except ProviderError as exc:
         raise exc.to_app_exception() from exc
+    message = (
+        f"Xem trước đồng bộ: {result.created} mới, {result.updated} cập nhật, "
+        f"{result.discontinued} ngưng bán, {result.warnings} cảnh báo."
+        if payload.dry_run
+        else f"Đồng bộ xong: {result.created} mới, {result.updated} cập nhật, "
+        f"{result.discontinued} ngưng bán, {result.warnings} cảnh báo."
+    )
     return success(
         {
+            "run_id": result.run_id,
+            "dry_run": result.dry_run,
             "total": result.total,
             "created": result.created,
             "updated": result.updated,
+            "discontinued": result.discontinued,
+            "reactivated": result.reactivated,
+            "unchanged": result.unchanged,
+            "warnings": result.warnings,
+            "errors": result.errors,
             "livemode": result.livemode,
         },
-        f"Đồng bộ xong: {result.created} mới, {result.updated} cập nhật.",
+        message,
     )
+
+
+# ---------- Lịch sử đồng bộ catalog (Admin) ----------
+@router.get("/sync-runs", summary="Lịch sử đồng bộ catalog nhà cung cấp")
+def list_sync_runs(
+    params: ListParams = Depends(list_params),
+    ctx: RequestContext = Depends(require("partner.index")),
+    db: Session = Depends(get_db),
+) -> dict:
+    items, total = catalog_sync.list_runs(
+        db,
+        organization_id=ctx.organization_id,
+        supplier_id=params.supplier_id,
+        status=params.status,
+        offset=params.offset,
+        limit=params.limit,
+    )
+    return paginated(
+        [CatalogSyncRunOut.model_validate(i).model_dump(mode="json") for i in items],
+        total,
+        params.page,
+        params.limit,
+    )
+
+
+@router.get("/sync-runs/{run_id}/items", summary="Chi tiết thay đổi của một lần đồng bộ")
+def list_sync_run_items(
+    run_id: int,
+    ctx: RequestContext = Depends(require("partner.index")),
+    db: Session = Depends(get_db),
+) -> dict:
+    items = catalog_sync.list_run_items(db, run_id, organization_id=ctx.organization_id)
+    return success([CatalogSyncItemOut.model_validate(i).model_dump(mode="json") for i in items])
 
 
 # ---------- Balance (Admin) ----------

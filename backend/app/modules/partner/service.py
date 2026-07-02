@@ -24,6 +24,7 @@ from app.integrations.errors import ProviderError
 from app.modules.categories.models import Category
 from app.modules.orders.models import Order
 from app.modules.organizations.utils import slugify
+from app.modules.partner import catalog_sync
 from app.modules.partner.models import ProviderOrderRef, ProviderWebhookEvent
 from app.modules.partner.repository import (
     ProviderOrderRefRepository,
@@ -232,8 +233,15 @@ def _parse_iso(value: str | None) -> datetime | None:
 class CatalogSyncResult:
     created: int = 0
     updated: int = 0
+    discontinued: int = 0
+    reactivated: int = 0
+    unchanged: int = 0
+    warnings: int = 0
+    errors: int = 0
     total: int = 0
     livemode: bool = False
+    run_id: int | None = None
+    dry_run: bool = False
 
 
 def _get_or_create_category(
@@ -272,83 +280,25 @@ def _get_or_create_category(
 
 
 def sync_catalog(db: Session, supplier: Supplier) -> CatalogSyncResult:
-    """Đồng bộ catalog NCC -> bảng Product nội bộ.
+    """Đồng bộ catalog NCC -> Product, có audit SyncRun và cảnh báo biên lãi.
 
-    Map theo (supplier_id, external_id). Sản phẩm mới -> tạo (markup mặc định 0,
-    admin tự chỉnh giá bán sau). Sản phẩm cũ -> chỉ cập nhật base_price/tồn kho/tên,
-    KHÔNG đụng markup do ta tự đặt. Không tự xóa sản phẩm để tránh mất lịch sử.
-
-    Tên danh mục NCC được get-or-create thành Category nội bộ và gắn vào
-    Product.category_id (kèm giữ category_name để fallback/hiển thị).
+    Giữ chữ ký cũ để các test/endpoint đang gọi không phải đổi. Logic thật nằm ở
+    partner.catalog_sync để hỗ trợ thêm dry-run, lịch sử, lock và automation.
     """
-    client = registry.get_client(supplier)
-    catalog = client.get_catalog()
-
-    # % markup mặc định -> sản phẩm MỚI có giá bán ngay (sản phẩm cũ giữ markup admin đã đặt).
-    default_markup = settings_service.get_default_markup_percent(db)
-
-    # Gom tất cả product kèm tên danh mục (uncategorized -> None).
-    vd_products: list[tuple[object, str | None]] = [(p, None) for p in catalog.uncategorized]
-    for cat in catalog.categories:
-        vd_products.extend((p, cat.name) for p in cat.products)
-
-    result = CatalogSyncResult(total=len(vd_products), livemode=catalog.livemode)
-    category_cache: dict[str, Category] = {}
-
-    for vp, category_name in vd_products:
-        fields = client.map_catalog_product(vp)
-        category = _get_or_create_category(
-            db, category_cache, category_name, supplier.organization_id
-        )
-        category_id = category.id if category is not None else None
-        existing = db.scalars(
-            select(Product).where(
-                Product.supplier_id == supplier.id,
-                Product.external_id == fields["external_id"],
-            )
-        ).first()
-
-        if existing is None:
-            product = Product(
-                name=fields["name"],
-                slug=slugify(fields["name"]) or fields["external_id"],
-                description=fields["description"],
-                name_en=fields.get("name_en"),
-                category_name=category_name,
-                category_id=category_id,
-                supplier_id=supplier.id,
-                external_id=fields["external_id"],
-                base_price=fields["base_price"],
-                regular_price=fields.get("regular_price"),
-                provider_discount_percent=fields.get("provider_discount_percent"),
-                delivery_type=fields.get("delivery_type"),
-                provider_quantity=fields.get("provider_quantity"),
-                markup_percent=default_markup,
-                stock_status=fields["stock_status"],
-                status="active",
-                organization_id=supplier.organization_id,
-            )
-            db.add(product)
-            result.created += 1
-        else:
-            # Chỉ cập nhật dữ liệu nguồn, giữ nguyên markup/giá bán do ta đặt.
-            existing.name = fields["name"]
-            existing.description = fields["description"]
-            existing.name_en = fields.get("name_en")
-            existing.category_name = category_name
-            # Chỉ gắn category_id khi NCC có danh mục — không xóa liên kết admin tự đặt.
-            if category_id is not None:
-                existing.category_id = category_id
-            existing.base_price = fields["base_price"]
-            existing.regular_price = fields.get("regular_price")
-            existing.provider_discount_percent = fields.get("provider_discount_percent")
-            existing.delivery_type = fields.get("delivery_type")
-            existing.provider_quantity = fields.get("provider_quantity")
-            existing.stock_status = fields["stock_status"]
-            result.updated += 1
-
-    db.commit()
-    return result
+    result = catalog_sync.run_supplier_sync(db, supplier, dry_run=False, mode="manual")
+    return CatalogSyncResult(
+        created=result.created,
+        updated=result.updated,
+        discontinued=result.discontinued,
+        reactivated=result.reactivated,
+        unchanged=result.unchanged,
+        warnings=result.warnings,
+        errors=result.errors,
+        total=result.total,
+        livemode=result.livemode,
+        run_id=result.run_id,
+        dry_run=result.dry_run,
+    )
 
 
 # ---- Balance (GET /balance) -----------------------------------------------

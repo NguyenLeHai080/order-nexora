@@ -33,6 +33,11 @@ export const SETTING_KEYS = {
   smsApiSecret: 'sms_api_secret',
   smsBrandname: 'sms_brandname',
   smsEndpoint: 'sms_endpoint',
+  // Tự động hóa — đồng bộ catalog NCC
+  catalogSyncEnabled: 'catalog_sync_enabled',
+  catalogSyncInterval: 'catalog_sync_interval_minutes',
+  catalogSyncDiscontinueMissing: 'catalog_sync_discontinue_missing',
+  catalogSyncNotify: 'catalog_sync_notify',
 } as const;
 
 // Nhà cung cấp SMS hỗ trợ (khớp notifications/service.py send_customer_sms).
@@ -47,6 +52,7 @@ export const SMS_PROVIDERS = [
 export const SETTING_TABS = [
   { key: 'general', label: 'Chung', icon: 'bi-sliders' },
   { key: 'sales', label: 'Guest & Bán hàng', icon: 'bi-bag-check' },
+  { key: 'automation', label: 'Tự động hóa', icon: 'bi-robot' },
   { key: 'notifications', label: 'Thông báo', icon: 'bi-bell' },
   { key: 'advanced', label: 'Nâng cao', icon: 'bi-wrench-adjustable' },
 ] as const;

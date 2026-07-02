@@ -19,6 +19,8 @@ from app.modules.organizations.models import Organization  # noqa: F401
 from app.modules.partner.models import (  # noqa: F401
     ProviderOrderRef,
     ProviderWebhookEvent,
+    SupplierSyncItem,
+    SupplierSyncRun,
 )
 from app.modules.payments.models import BankAccount, Deposit  # noqa: F401
 from app.modules.permissions.models import Permission, Role, role_permissions  # noqa: F401

@@ -7,11 +7,12 @@ import { SETTING_TABS } from '../config/settingConfig';
 import GeneralPanel from '../components/GeneralPanel';
 import SalesPanel from '../components/SalesPanel';
 import NotificationsPanel from '../components/NotificationsPanel';
+import AutomationPanel from '../components/AutomationPanel';
 import AdvancedPanel from '../components/AdvancedPanel';
 
 type TabKey = (typeof SETTING_TABS)[number]['key'];
 
-// Trang cài đặt: tab dọc theo nhóm (Chung / Guest & Bán hàng / Thông báo / Nâng cao).
+// Trang cài đặt: tab dọc theo nhóm (Chung / Guest & Bán hàng / Tự động hóa / Thông báo / Nâng cao).
 export default function SettingPage() {
   const { settings, maintenance, loading, savingKey, toast, notify, toggleMaintenance, saveSetting } = useSettings();
   const [tab, setTab] = useState<TabKey>('general');
@@ -56,6 +57,9 @@ export default function SettingPage() {
           )}
           {tab === 'sales' && (
             <SalesPanel settings={settings} savingKey={savingKey} onSave={saveSetting} />
+          )}
+          {tab === 'automation' && (
+            <AutomationPanel settings={settings} savingKey={savingKey} onSave={saveSetting} />
           )}
           {tab === 'notifications' && (
             <NotificationsPanel settings={settings} savingKey={savingKey} onSave={saveSetting} onNotify={notify} />
