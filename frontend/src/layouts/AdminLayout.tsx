@@ -27,7 +27,6 @@ const MENU: { section: string; items: MenuItem[] }[] = [
       { to: '/admin/inventory', label: 'Tồn kho (sổ kho)', icon: 'bi-clipboard-data', can: { action: 'index', subject: 'Inventory' } },
       { to: '/admin/suppliers', label: 'Nhà cung cấp kho', icon: 'bi-truck', can: { action: 'index', subject: 'Supplier' } },
       { to: '/admin/integrations', label: 'NCC & Tích hợp API', icon: 'bi-plugin', can: { action: 'index', subject: 'Partner' } },
-      { to: '/admin/profit', label: 'Lợi nhuận', icon: 'bi-graph-up-arrow', can: { action: 'index', subject: 'Order' } },
     ],
   },
   {
@@ -43,7 +42,9 @@ const MENU: { section: string; items: MenuItem[] }[] = [
   {
     section: 'Tài chính',
     items: [
+      { to: '/admin/finance', label: 'Tổng quan tài chính', icon: 'bi-cash-coin', can: { action: 'index', subject: 'Finance' } },
       { to: '/admin/payments', label: 'Thanh toán & Nạp tiền', icon: 'bi-credit-card', can: { action: 'index', subject: 'Payment' } },
+      { to: '/admin/profit', label: 'Lợi nhuận', icon: 'bi-graph-up-arrow', can: { action: 'index', subject: 'Order' } },
     ],
   },
   {

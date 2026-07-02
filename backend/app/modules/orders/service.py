@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException, NotFoundError
+from app.modules.finance import service as finance_service
 from app.modules.inventory.service import apply_movement, has_movement, uses_local_stock
 from app.modules.invoices import service as invoice_service
 from app.modules.notifications import service as notification_service
@@ -102,7 +103,14 @@ def credit_owner_profit(db: Session, order: Order) -> None:
     owner = db.get(User, order.owner_user_id)
     if owner is None:
         return
-    owner.balance = (owner.balance or Decimal("0")) + (order.owner_profit or Decimal("0"))
+    profit = order.owner_profit or Decimal("0")
+    if profit == 0:
+        return
+    finance_service.post_wallet_txn(
+        db, owner, type="owner_profit", direction="in", amount=profit,
+        organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+        note="Lãi bán hàng về ví chủ", allow_negative=True,
+    )
 
 
 def reverse_owner_profit(db: Session, order: Order) -> None:
@@ -111,7 +119,14 @@ def reverse_owner_profit(db: Session, order: Order) -> None:
     owner = db.get(User, order.owner_user_id)
     if owner is None:
         return
-    owner.balance = (owner.balance or Decimal("0")) - (order.owner_profit or Decimal("0"))
+    profit = order.owner_profit or Decimal("0")
+    if profit == 0:
+        return
+    finance_service.post_wallet_txn(
+        db, owner, type="owner_profit", direction="out", amount=profit,
+        organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+        note="Đảo lãi ví chủ (hủy/hoàn đơn)", allow_negative=True,
+    )
 
 
 def apply_owner_profit_delta(db: Session, order: Order, new_owner_profit: Decimal) -> None:
@@ -121,7 +136,11 @@ def apply_owner_profit_delta(db: Session, order: Order, new_owner_profit: Decima
         order.owner_user_id = resolve_owner_user_id(db, order.organization_id, order.user_id)
     owner = db.get(User, order.owner_user_id) if order.owner_user_id else None
     if owner is not None and delta:
-        owner.balance = (owner.balance or Decimal("0")) + delta
+        finance_service.post_wallet_txn(
+            db, owner, type="owner_profit", direction="in", amount=delta,
+            organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+            note="Điều chỉnh lãi ví chủ", allow_negative=True,
+        )
     order.owner_profit = new_owner_profit
 
 
@@ -155,8 +174,7 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
     if (user.balance or Decimal("0")) < total:
         raise AppException("Số dư không đủ. Vui lòng nạp thêm tiền.")
 
-    # Trừ tiền trước, tạo đơn ở trạng thái processing.
-    user.balance = user.balance - total
+    # Tạo đơn ở trạng thái processing, rồi trừ ví qua sổ cái (cần order.id).
     order = Order(
         code=_gen_code(),
         user_id=user_id,
@@ -182,6 +200,12 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
         order.manual_contact_url = cfg["zalo_url"]
         order.manual_qr_image_url = cfg["qr_url"]
     db.add(order)
+    db.flush()  # có order.id để tham chiếu bút toán ví
+    finance_service.post_wallet_txn(
+        db, user, type="purchase", direction="out", amount=total,
+        organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+        note=f"Mua {product.name}", actor_id=user_id,
+    )
     db.commit()
     db.refresh(order)
 
@@ -190,7 +214,11 @@ def purchase(db: Session, user_id: int, product_id: int, quantity: int, voucher_
 
     if delivery.status == "failed":
         # Hoàn tiền + đánh dấu thất bại.
-        user.balance = user.balance + total
+        finance_service.post_wallet_txn(
+            db, user, type="refund", direction="in", amount=total,
+            organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+            note="Hoàn tiền: lấy hàng thất bại", actor_id=user_id,
+        )
         order.status = "failed"
         order.note = delivery.note or "Nhà cung cấp hết hàng hoặc lỗi khi lấy hàng."
         db.commit()
@@ -269,7 +297,11 @@ def cancel_order(db: Session, order: Order, actor_id: int) -> Order:
     # Hoàn tiền vào ví khách.
     user = db.get(User, order.user_id)
     if user is not None:
-        user.balance = (user.balance or Decimal("0")) + (order.total_amount or Decimal("0"))
+        finance_service.post_wallet_txn(
+            db, user, type="refund", direction="in", amount=order.total_amount or Decimal("0"),
+            organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+            note="Hoàn tiền: hủy đơn", actor_id=actor_id,
+        )
     reverse_owner_profit(db, order)
 
     # Hồi kho + đảo dòng tiền nếu đơn đã ghi sổ bán (`out`) và chưa hoàn (`return`).
@@ -493,7 +525,12 @@ def fulfill_order_admin(
             # Đơn ví: hoàn tiền vào ví + đảo lãi owner + đảo sổ (tái dùng cancel logic).
             user = db.get(User, order.user_id)
             if user is not None:
-                user.balance = (user.balance or Decimal("0")) + (order.total_amount or Decimal("0"))
+                finance_service.post_wallet_txn(
+                    db, user, type="refund", direction="in",
+                    amount=order.total_amount or Decimal("0"),
+                    organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+                    note="Hoàn tiền: đơn xử lý thất bại", actor_id=actor_id or order.user_id,
+                )
             reverse_owner_profit(db, order)
             _reverse_sale_ledger(db, order, actor_id=actor_id or order.user_id)
             order.note = note or "Đơn xử lý thất bại, đã hoàn tiền vào ví."

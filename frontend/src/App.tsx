@@ -21,6 +21,7 @@ import SupplierListPage from './modules/Suppliers/pages/SupplierListPage';
 import OrderListPage from './modules/Orders/pages/OrderListPage';
 import ProfitPage from './modules/Profit/pages/ProfitPage';
 import PaymentPage from './modules/Payments/pages/PaymentPage';
+import FinancePage from './modules/Finance/pages/FinancePage';
 import VoucherListPage from './modules/Vouchers/pages/VoucherListPage';
 import SettingPage from './modules/Settings/pages/SettingPage';
 import LogActivityPage from './modules/LogActivities/pages/LogActivityPage';
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="returns" element={<ProtectedRoute permission="returns.index"><ReturnListPage /></ProtectedRoute>} />
           <Route path="profit" element={<ProtectedRoute permission="orders.index"><ProfitPage /></ProtectedRoute>} />
           <Route path="payments" element={<ProtectedRoute permission="payments.index"><PaymentPage /></ProtectedRoute>} />
+          <Route path="finance" element={<ProtectedRoute permission="finance.index"><FinancePage /></ProtectedRoute>} />
           <Route path="vouchers" element={<ProtectedRoute permission="vouchers.index"><VoucherListPage /></ProtectedRoute>} />
           <Route path="partner-webhooks" element={<Navigate to="/admin/integrations" replace />} />
           <Route path="integrations" element={<ProtectedRoute permission="partner.index"><IntegrationsPage /></ProtectedRoute>} />

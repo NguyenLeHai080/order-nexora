@@ -108,7 +108,13 @@ def process_webhook(db: Session, reference_code: str, amount: Decimal, signature
         user = db.get(User, deposit.user_id)
         if user is None:
             raise NotFoundError("Người dùng không tồn tại.")
-        user.balance = (user.balance or Decimal("0")) + amount
+        from app.modules.finance import service as finance_service
+
+        finance_service.post_wallet_txn(
+            db, user, type="deposit", direction="in", amount=amount,
+            organization_id=deposit.organization_id, ref_type="deposit", ref_id=deposit.id,
+            note="Nạp tiền (webhook)",
+        )
         deposit.status = "success"
         db.commit()
         return {"reference_code": reference_code, "status": "success"}

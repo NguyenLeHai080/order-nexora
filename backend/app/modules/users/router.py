@@ -176,11 +176,20 @@ def adjust_balance(
     user_id: int,
     body: BalanceAdjust,
     db: Session = Depends(get_db),
-    _ctx: RequestContext = Depends(require("users.update")),
+    ctx: RequestContext = Depends(require("users.update")),
 ) -> dict:
     repo = UserRepository(db)
     obj = repo.get(user_id)
     if obj is None:
         raise NotFoundError("Không tìm thấy người dùng.")
-    obj = repo.adjust_balance(obj, body.amount)
+    from app.modules.finance import service as finance_service
+
+    finance_service.post_wallet_txn(
+        db, obj, type="adjustment",
+        direction="in" if body.amount >= 0 else "out", amount=body.amount,
+        organization_id=ctx.organization_id,
+        note=getattr(body, "note", None) or "Điều chỉnh số dư (admin)", actor_id=ctx.user_id,
+    )
+    db.commit()
+    db.refresh(obj)
     return success({"id": obj.id, "balance": str(obj.balance)}, "Điều chỉnh số dư thành công.")

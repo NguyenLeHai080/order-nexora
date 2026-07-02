@@ -28,6 +28,7 @@ def _collect_routers() -> list[APIRouter]:
     from app.modules.categories.router import router as categories_router
     from app.modules.content.router import articles_router, faqs_router
     from app.modules.engagement.router import router as engagement_router
+    from app.modules.finance.router import router as finance_router
     from app.modules.inventory.router import router as inventory_router
     from app.modules.invoices.router import router as invoices_router
     from app.modules.log_activities.router import router as log_router
@@ -63,6 +64,7 @@ def _collect_routers() -> list[APIRouter]:
         articles_router,
         faqs_router,
         engagement_router,
+        finance_router,
         inventory_router,
         payments_router,
         partner_router,

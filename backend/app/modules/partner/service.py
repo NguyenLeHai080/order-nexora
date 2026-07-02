@@ -488,7 +488,14 @@ def _apply_order_update(db: Session, ref: ProviderOrderRef, vd_order, supplier: 
     if new_status == "failed" and order.status != "failed":
         user = db.get(User, order.user_id)
         if user is not None:
-            user.balance = (user.balance or Decimal("0")) + (order.total_amount or Decimal("0"))
+            from app.modules.finance import service as finance_service
+
+            finance_service.post_wallet_txn(
+                db, user, type="refund", direction="in",
+                amount=order.total_amount or Decimal("0"),
+                organization_id=order.organization_id, ref_type="order", ref_id=order.id,
+                note="Hoàn tiền: NCC hủy đơn",
+            )
         order.status = "failed"
         order.note = "Nhà cung cấp đã hủy đơn, đã hoàn tiền vào ví."
     elif new_status == "success":

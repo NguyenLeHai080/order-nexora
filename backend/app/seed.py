@@ -21,6 +21,7 @@ _SUBJECTS = [
     "categories",
     "products",
     "payments",
+    "finance",
     "orders",
     "vouchers",
     "partner",
